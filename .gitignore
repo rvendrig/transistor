@@ -36,3 +36,19 @@ dist/
 # Testing
 coverage/
 .jest/
+
+# Build output
+iOS/build/
+iOS/build-sim/
+
+# Xcode user data
+*.xcuserstate
+xcuserdata/
+
+# Build output
+iOS/build/
+iOS/build-sim/
+
+# Xcode user data
+*.xcuserstate
+xcuserdata/
