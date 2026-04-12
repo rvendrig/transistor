@@ -15,7 +15,7 @@ class ContentViewModel: ObservableObject {
 
     // MARK: - Provider Management
     @Published var selectedProviders: Set<String> = ["npo"]
-    @ObservedObject var providerStore = ProviderStore.shared
+    let providerStore = ProviderStore.shared
 
     // MARK: - Playlist properties
     @Published var playlists: [Playlist] = []

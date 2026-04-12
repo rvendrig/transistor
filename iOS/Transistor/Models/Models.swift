@@ -180,33 +180,5 @@ enum PlaylistItemType: String, Codable {
     case npoProgram = "npo_program"
 }
 
-// MARK: - Marker Model
-struct NPOMarker: Identifiable, Codable {
-    let id: String
-    let broadcastId: String
-    let timestamp: Int // offset from broadcast start in seconds
-    let tags: [String]
-    let createdAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id, timestamp, tags
-        case broadcastId = "broadcast_id"
-        case createdAt = "created_at"
-    }
-}
-
-// MARK: - Favorite Model
-struct NPOFavorite: Identifiable, Codable {
-    let id: String
-    let broadcastId: String
-    let itemType: String?
-    let programId: String?
-    let addedAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id, itemType
-        case broadcastId = "broadcast_id"
-        case programId = "program_id"
-        case addedAt = "added_at"
-    }
-}
+// Note: Generic Marker and Favorite models are now in GenericModels.swift
+// These replace the NPO-specific versions for provider-agnostic support

@@ -99,15 +99,6 @@ class DatabaseService {
         )
         """
 
-        let createFavoritesTable = """
-        CREATE TABLE IF NOT EXISTS favorites (
-            id TEXT PRIMARY KEY,
-            item_id TEXT NOT NULL,
-            item_type TEXT,
-            added_at TEXT
-        )
-        """
-
         let createSubscriptionsTable = """
         CREATE TABLE IF NOT EXISTS subscriptions (
             id TEXT PRIMARY KEY,
@@ -148,35 +139,36 @@ class DatabaseService {
         """
 
         let createMarkersTable = """
-        CREATE TABLE IF NOT EXISTS npo_markers (
+        CREATE TABLE IF NOT EXISTS markers (
             id TEXT PRIMARY KEY,
-            broadcast_id TEXT NOT NULL,
+            content_id TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
             timestamp INTEGER NOT NULL,
             tags TEXT,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(broadcast_id) REFERENCES npo_broadcasts(id) ON DELETE CASCADE
+            created_at TEXT NOT NULL
         )
         """
 
         let createMarkersIndices = """
-        CREATE INDEX IF NOT EXISTS idx_npo_markers_broadcast_id
-        ON npo_markers(broadcast_id)
+        CREATE INDEX IF NOT EXISTS idx_markers_content_id
+        ON markers(content_id)
         """
 
-        let createNPOFavoritesTable = """
-        CREATE TABLE IF NOT EXISTS npo_favorites (
+        let createFavoritesTable = """
+        CREATE TABLE IF NOT EXISTS favorites (
             id TEXT PRIMARY KEY,
-            broadcast_id TEXT NOT NULL,
-            item_type TEXT,
-            program_id TEXT,
+            content_id TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
             added_at TEXT NOT NULL,
-            FOREIGN KEY(broadcast_id) REFERENCES npo_broadcasts(id) ON DELETE CASCADE
+            UNIQUE(content_id)
         )
         """
 
-        let createNPOFavoritesIndices = """
-        CREATE INDEX IF NOT EXISTS idx_npo_favorites_broadcast_id
-        ON npo_favorites(broadcast_id)
+        let createFavoritesIndices = """
+        CREATE INDEX IF NOT EXISTS idx_favorites_content_id
+        ON favorites(content_id)
         """
 
         for createTableSQL in [
@@ -186,15 +178,14 @@ class DatabaseService {
             createItemsTable,
             createPodcastFeedsTable,
             createPodcastEpisodesTable,
-            createFavoritesTable,
             createSubscriptionsTable,
             createPlaylistsTable,
             createPlaylistItemsTable,
             createPlaylistItemsIndices,
             createMarkersTable,
             createMarkersIndices,
-            createNPOFavoritesTable,
-            createNPOFavoritesIndices
+            createFavoritesTable,
+            createFavoritesIndices
         ] {
             var errorMessage: UnsafeMutablePointer<Int8>?
             if sqlite3_exec(db, createTableSQL, nil, nil, &errorMessage) != SQLITE_OK {
@@ -658,54 +649,59 @@ class DatabaseService {
         sqlite3_finalize(statement)
     }
 
-    // MARK: - Marker Operations
+    // MARK: - Marker Operations (Generic - works with any content type)
 
-    func createMarker(broadcastId: String, timestamp: Int, tags: [String]) -> NPOMarker? {
+    func createMarker(contentId: String, contentType: ContentType, providerId: String, timestamp: Int, tags: [String]) -> Marker? {
         let id = UUID().uuidString
         let dateFormatter = ISO8601DateFormatter()
         let createdAt = dateFormatter.string(from: Date())
 
         let tagsJSON = (try? JSONSerialization.data(withJSONObject: tags)) ?? Data()
         let query = """
-        INSERT INTO npo_markers (id, broadcast_id, timestamp, tags, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO markers (id, content_id, content_type, provider_id, timestamp, tags, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 2, broadcastId, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_int(statement, 3, Int32(timestamp))
-            sqlite3_bind_blob(statement, 4, (tagsJSON as NSData).bytes, Int32(tagsJSON.count), SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 5, createdAt, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, contentId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, contentType.rawValue, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, providerId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int(statement, 5, Int32(timestamp))
+            sqlite3_bind_blob(statement, 6, (tagsJSON as NSData).bytes, Int32(tagsJSON.count), SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 7, createdAt, -1, SQLITE_TRANSIENT)
 
             if sqlite3_step(statement) == SQLITE_DONE {
                 sqlite3_finalize(statement)
-                return NPOMarker(id: id, broadcastId: broadcastId, timestamp: timestamp, tags: tags, createdAt: Date())
+                return Marker(id: id, contentId: contentId, contentType: contentType, providerId: providerId, timestamp: timestamp, tags: tags, createdAt: Date())
             }
         }
         sqlite3_finalize(statement)
         return nil
     }
 
-    func getMarkersByBroadcast(_ broadcastId: String) -> [NPOMarker] {
-        var markers: [NPOMarker] = []
-        let query = "SELECT id, broadcast_id, timestamp, tags, created_at FROM npo_markers WHERE broadcast_id = ? ORDER BY timestamp ASC"
+    func getMarkersByContent(_ contentId: String) -> [Marker] {
+        var markers: [Marker] = []
+        let query = "SELECT id, content_id, content_type, provider_id, timestamp, tags, created_at FROM markers WHERE content_id = ? ORDER BY timestamp ASC"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, contentId, -1, SQLITE_TRANSIENT)
 
             let dateFormatter = ISO8601DateFormatter()
             while sqlite3_step(statement) == SQLITE_ROW {
                 let id = String(cString: sqlite3_column_text(statement, 0))
-                let broadcastId = String(cString: sqlite3_column_text(statement, 1))
-                let timestamp = Int(sqlite3_column_int(statement, 2))
-                let createdAtString = String(cString: sqlite3_column_text(statement, 4))
+                let contentId = String(cString: sqlite3_column_text(statement, 1))
+                let contentTypeString = String(cString: sqlite3_column_text(statement, 2))
+                let contentType = ContentType(rawValue: contentTypeString) ?? .broadcast
+                let providerId = String(cString: sqlite3_column_text(statement, 3))
+                let timestamp = Int(sqlite3_column_int(statement, 4))
+                let createdAtString = String(cString: sqlite3_column_text(statement, 6))
 
                 var tags: [String] = []
-                if let data = sqlite3_column_blob(statement, 3) {
-                    let length = sqlite3_column_bytes(statement, 3)
+                if let data = sqlite3_column_blob(statement, 5) {
+                    let length = sqlite3_column_bytes(statement, 5)
                     let nsData = NSData(bytes: data, length: Int(length))
                     if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
                         tags = parsed
@@ -713,7 +709,7 @@ class DatabaseService {
                 }
 
                 if let createdAt = dateFormatter.date(from: createdAtString) {
-                    let marker = NPOMarker(id: id, broadcastId: broadcastId, timestamp: timestamp, tags: tags, createdAt: createdAt)
+                    let marker = Marker(id: id, contentId: contentId, contentType: contentType, providerId: providerId, timestamp: timestamp, tags: tags, createdAt: createdAt)
                     markers.append(marker)
                 }
             }
@@ -723,7 +719,7 @@ class DatabaseService {
     }
 
     func deleteMarker(_ markerId: String) -> Bool {
-        let query = "DELETE FROM npo_markers WHERE id = ?"
+        let query = "DELETE FROM markers WHERE id = ?"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
@@ -738,45 +734,41 @@ class DatabaseService {
         return false
     }
 
-    // MARK: - Favorites Operations
+    // MARK: - Favorites Operations (Generic)
 
-    func addFavorite(broadcastId: String, itemType: String? = nil, programId: String? = nil) -> NPOFavorite? {
+    func addFavorite(contentId: String, contentType: ContentType, providerId: String) -> Favorite? {
         let id = UUID().uuidString
         let dateFormatter = ISO8601DateFormatter()
         let addedAt = dateFormatter.string(from: Date())
 
         let query = """
-        INSERT OR REPLACE INTO npo_favorites (id, broadcast_id, item_type, program_id, added_at)
+        INSERT OR REPLACE INTO favorites (id, content_id, content_type, provider_id, added_at)
         VALUES (?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 2, broadcastId, -1, SQLITE_TRANSIENT)
-            if let itemType = itemType {
-                sqlite3_bind_text(statement, 3, itemType, -1, SQLITE_TRANSIENT)
-            }
-            if let programId = programId {
-                sqlite3_bind_text(statement, 4, programId, -1, SQLITE_TRANSIENT)
-            }
+            sqlite3_bind_text(statement, 2, contentId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, contentType.rawValue, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, providerId, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(statement, 5, addedAt, -1, SQLITE_TRANSIENT)
 
             if sqlite3_step(statement) == SQLITE_DONE {
                 sqlite3_finalize(statement)
-                return NPOFavorite(id: id, broadcastId: broadcastId, itemType: itemType, programId: programId, addedAt: Date())
+                return Favorite(id: id, contentId: contentId, contentType: contentType, providerId: providerId, addedAt: Date())
             }
         }
         sqlite3_finalize(statement)
         return nil
     }
 
-    func removeFavorite(_ broadcastId: String) -> Bool {
-        let query = "DELETE FROM npo_favorites WHERE broadcast_id = ?"
+    func removeFavorite(_ contentId: String) -> Bool {
+        let query = "DELETE FROM favorites WHERE content_id = ?"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, contentId, -1, SQLITE_TRANSIENT)
 
             if sqlite3_step(statement) == SQLITE_DONE {
                 sqlite3_finalize(statement)
@@ -787,12 +779,12 @@ class DatabaseService {
         return false
     }
 
-    func isFavorite(_ broadcastId: String) -> Bool {
-        let query = "SELECT COUNT(*) FROM npo_favorites WHERE broadcast_id = ?"
+    func isFavorite(_ contentId: String) -> Bool {
+        let query = "SELECT COUNT(*) FROM favorites WHERE content_id = ?"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, contentId, -1, SQLITE_TRANSIENT)
 
             if sqlite3_step(statement) == SQLITE_ROW {
                 let count = sqlite3_column_int(statement, 0)
@@ -804,22 +796,23 @@ class DatabaseService {
         return false
     }
 
-    func getAllFavorites() -> [NPOFavorite] {
-        var favorites: [NPOFavorite] = []
-        let query = "SELECT id, broadcast_id, item_type, program_id, added_at FROM npo_favorites ORDER BY added_at DESC"
+    func getAllFavorites() -> [Favorite] {
+        var favorites: [Favorite] = []
+        let query = "SELECT id, content_id, content_type, provider_id, added_at FROM favorites ORDER BY added_at DESC"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             let dateFormatter = ISO8601DateFormatter()
             while sqlite3_step(statement) == SQLITE_ROW {
                 let id = String(cString: sqlite3_column_text(statement, 0))
-                let broadcastId = String(cString: sqlite3_column_text(statement, 1))
-                let itemType = sqlite3_column_text(statement, 2).map { String(cString: $0) }
-                let programId = sqlite3_column_text(statement, 3).map { String(cString: $0) }
+                let contentId = String(cString: sqlite3_column_text(statement, 1))
+                let contentTypeString = String(cString: sqlite3_column_text(statement, 2))
+                let contentType = ContentType(rawValue: contentTypeString) ?? .broadcast
+                let providerId = String(cString: sqlite3_column_text(statement, 3))
                 let addedAtString = String(cString: sqlite3_column_text(statement, 4))
 
                 if let addedAt = dateFormatter.date(from: addedAtString) {
-                    let favorite = NPOFavorite(id: id, broadcastId: broadcastId, itemType: itemType, programId: programId, addedAt: addedAt)
+                    let favorite = Favorite(id: id, contentId: contentId, contentType: contentType, providerId: providerId, addedAt: addedAt)
                     favorites.append(favorite)
                 }
             }
