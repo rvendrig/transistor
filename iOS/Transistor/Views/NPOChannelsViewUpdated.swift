@@ -153,6 +153,9 @@ struct NPOBroadcastsViewV2: View {
 
     @StateObject private var viewModel = NPOViewModel()
     @State private var selectedBroadcast: NPOBroadcast?
+    @State private var showAddBroadcastToPlaylist = false
+    @State private var showAddProgramToPlaylist = false
+    @State private var selectedBroadcastForPlaylist: NPOBroadcast?
 
     var body: some View {
         Group {
@@ -206,17 +209,48 @@ struct NPOBroadcastsViewV2: View {
                     }
                     .padding(.vertical, 8)
                 }
+                .contextMenu {
+                    Button(action: {
+                        selectedBroadcastForPlaylist = broadcast
+                        showAddBroadcastToPlaylist = true
+                    }) {
+                        Label("Add Broadcast to Playlist", systemImage: "plus.circle")
+                    }
+
+                    Button(action: {
+                        showAddProgramToPlaylist = true
+                    }) {
+                        Label("Add Program to Playlist", systemImage: "plus.circle")
+                    }
+                }
             }
         }
         .listStyle(.plain)
         .navigationTitle(program.title)
         .background(Color.darkBg)
+        .sheet(isPresented: $showAddBroadcastToPlaylist) {
+            if let broadcast = selectedBroadcastForPlaylist {
+                AddToPlaylistView(viewModel: viewModel, playlistId: broadcast.id, isPresented: $showAddBroadcastToPlaylist)
+            }
+        }
+        .sheet(isPresented: $showAddProgramToPlaylist) {
+            AddToPlaylistView(viewModel: viewModel, playlistId: program.id, isPresented: $showAddProgramToPlaylist)
+        }
+        .onAppear {
+            Task {
+                await viewModel.loadBroadcasts(forProgram: program.id)
+            }
+            viewModel.loadPlaylists()
+        }
     }
 }
 
 struct NPOItemsViewV2: View {
     let broadcast: NPOBroadcast
     @State private var items: [NPOItem] = []
+    @StateObject private var viewModel = NPOViewModel()
+    @State private var showAddToPlaylist = false
+    @State private var selectedItemForPlaylist: NPOItem?
 
     var body: some View {
         List {
@@ -255,14 +289,28 @@ struct NPOItemsViewV2: View {
                         }
                         .padding(.vertical, 8)
                     }
+                    .contextMenu {
+                        Button(action: {
+                            selectedItemForPlaylist = item
+                            showAddToPlaylist = true
+                        }) {
+                            Label("Add to Playlist", systemImage: "plus.circle")
+                        }
+                    }
                 }
             }
         }
         .listStyle(.plain)
         .navigationTitle(broadcast.title)
         .background(Color.darkBg)
+        .sheet(isPresented: $showAddToPlaylist) {
+            if let selectedItem = selectedItemForPlaylist {
+                AddToPlaylistView(viewModel: viewModel, playlistId: selectedItem.id, isPresented: $showAddToPlaylist)
+            }
+        }
         .onAppear {
             items = NPODataService.shared.getItemsForBroadcast(broadcast.id)
+            viewModel.loadPlaylists()
         }
     }
 
