@@ -2,6 +2,29 @@
 
 A beautiful, fast podcast and radio program navigation app for iOS and Android.
 
+## 🎯 Versions
+
+**Transistor** now has two implementations:
+
+### 1. **Native iOS** (Recommended) ⭐
+Pure native SwiftUI app for iPhone with no external dependencies.
+- **Location**: `/iOS/Transistor/`
+- **Platform**: iOS 15+ (iPhone 12+)
+- **Tech**: Swift, SwiftUI, SQLite3
+- **Features**: Full offline support, fast, native feel
+- **Setup**: 5 minutes in Xcode
+- **Status**: ✅ Production Ready
+
+👉 **[See iOS Setup Guide →](./iOS/README.md)**
+
+### 2. **React Native / Expo** (Cross-Platform)
+Web and cross-platform version using React Native.
+- **Tech**: React Native, Expo, TypeScript
+- **Platforms**: iOS, Android, Web
+- **Note**: Expo is not recommended for production use
+
+**Use the Native iOS version for best experience!**
+
 ## Features
 
 - 🎙️ **Browse Podcasts** - Add and manage your favorite podcasts via RSS feeds
@@ -12,28 +35,47 @@ A beautiful, fast podcast and radio program navigation app for iOS and Android.
 - 👥 **Presenter & Guest Info** - See who hosts and who's being interviewed
 - 🎵 **Music Tracking** - View songs played during radio broadcasts
 - ❤️ **Favorites** - Save your favorite broadcasts and episodes
-- 📱 **Cross-Platform** - Works on iOS and Android with the same codebase
+- 📱 **Cross-Platform** - Native iOS + Web support
 - 🎨 **Beautiful UI** - Dark theme optimized for audio consumption
 
-## Tech Stack
+## Tech Stack (iOS)
 
-- **React Native** with Expo for cross-platform development
-- **TypeScript** for type-safe code
-- **SQLite** (expo-sqlite) for local episode storage
-- **Zustand** for state management
-- **Expo Router** for navigation
-- **xml2js** for RSS feed parsing
+- **Swift** native language
+- **SwiftUI** modern UI framework
+- **SQLite3** for local storage
+- **Async/await** for async operations
+- **MVVM** architecture pattern
+- **Zero External Dependencies** - Built-in frameworks only
 
 ## Getting Started
 
-### Prerequisites
+### 🍎 For iOS (Native, Recommended)
 
+See detailed setup instructions: **[iOS Setup Guide](./iOS/README.md)**
+
+Quick start:
+```bash
+# Open Xcode
+open -a Xcode iOS/Transistor
+
+# In Xcode:
+# 1. Select iPhone 15 Pro (or newer)
+# 2. Press Cmd + R to build and run
+```
+
+**Requirements:**
+- macOS 13.0+
+- Xcode 15.0+
+- iOS 15.0+ target
+
+### 🌐 For Web / Cross-Platform (React Native + Expo)
+
+**Prerequisites:**
 - Node.js (v18 or higher)
 - npm or yarn
 - Expo CLI (`npm install -g expo-cli`)
 
-### Installation
-
+**Installation:**
 ```bash
 # Clone the repository
 git clone <repo-url>
@@ -45,15 +87,17 @@ npm install
 # Start the development server
 npm start
 
-# For iOS
+# For iOS (Expo)
 npm run ios
 
-# For Android
+# For Android (Expo)
 npm run android
 
 # For Web
 npm run web
 ```
+
+⚠️ **Note**: Expo is not recommended for production. Use the native iOS version instead.
 
 ## Project Structure
 
