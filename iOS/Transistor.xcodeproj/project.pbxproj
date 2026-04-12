@@ -226,7 +226,7 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					6A229A5EE65BFE185860DD42 = {
-						DevelopmentTeam = FNU8F54DQ8;
+						DevelopmentTeam = 9P4AWS66VP;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -363,7 +363,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = FNU8F54DQ8;
+				DEVELOPMENT_TEAM = 9P4AWS66VP;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Transistor;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -452,7 +452,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = FNU8F54DQ8;
+				DEVELOPMENT_TEAM = 9P4AWS66VP;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Transistor;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
