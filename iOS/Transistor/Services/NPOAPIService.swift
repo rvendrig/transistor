@@ -199,6 +199,158 @@ class NPOAPIService {
         return results
     }
 
+    // MARK: - Fetch broadcast detail (uitzendingen page scrape)
+
+    func fetchBroadcastDetail(forChannel channelId: String, broadcastUrl: String) async throws -> NPOBroadcastDetail? {
+        guard let baseURL = Self.stationURLs[channelId] else {
+            throw NPOAPIError.invalidURL
+        }
+
+        guard let url = URL(string: "\(baseURL)\(broadcastUrl)") else {
+            throw NPOAPIError.invalidURL
+        }
+
+        let (data, response) = try await session.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        return parseBroadcastDetail(html: html)
+    }
+
+    // MARK: - Fetch uitzendingen list (with URLs for detail pages)
+
+    func fetchBroadcastList(forChannel channelId: String) async throws -> [NPOBroadcastListItem] {
+        guard let baseURL = Self.stationURLs[channelId] else {
+            throw NPOAPIError.invalidURL
+        }
+
+        guard let url = URL(string: "\(baseURL)/uitzendingen") else {
+            throw NPOAPIError.invalidURL
+        }
+
+        let (data, response) = try await session.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        return parseBroadcastList(html: html)
+    }
+
+    // MARK: - HTML Parsing helpers
+
+    private func parseBroadcastDetail(html: String) -> NPOBroadcastDetail? {
+        guard let jsonRange = html.range(of: "\"application/json\""),
+              let scriptStart = html[jsonRange.upperBound...].range(of: ">"),
+              let scriptEnd = html[scriptStart.upperBound...].range(of: "</script>") else {
+            return nil
+        }
+
+        let jsonString = String(html[scriptStart.upperBound..<scriptEnd.lowerBound])
+
+        guard let jsonData = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let props = (json["props"] as? [String: Any])?["pageProps"] as? [String: Any],
+              let rb = props["radioBroadcast"] as? [String: Any] else {
+            return nil
+        }
+
+        let description = rb["description"] as? String
+        let name = rb["name"] as? String
+        let presenters = rb["presenters"] as? [String] ?? []
+        let imageUrl = rb["imageUrl"] as? String
+
+        // Extract programme info
+        let prog = rb["programme"] as? [String: Any]
+        let programmeName = prog?["name"] as? String
+        let programmeUrl = prog?["url"] as? String
+        let recording = prog?["recording"] as? Bool ?? false
+
+        // Extract listen-back MP3 URL from showAssets
+        var listenBackUrl: String?
+        if let assets = rb["showAssets"] as? [[String: Any]], let first = assets.first,
+           let player = first["player"] as? [String: Any],
+           let params = player["parameters"] as? [[String: Any]] {
+            for param in params {
+                if param["name"] as? String == "progressive" {
+                    listenBackUrl = param["value"] as? String
+                }
+            }
+        }
+
+        // Extract fragments
+        var fragments: [NPOFragment] = []
+        if let fs = props["fragmentsSection"] as? [String: Any],
+           let frags = fs["fragments"] as? [[String: Any]] {
+            for frag in frags {
+                fragments.append(NPOFragment(
+                    id: frag["id"] as? String ?? "",
+                    name: frag["name"] as? String ?? "",
+                    imageUrl: frag["imageUrl"] as? String,
+                    type: frag["type"] as? String,
+                    url: frag["url"] as? String
+                ))
+            }
+        }
+
+        // Clean HTML from description
+        let cleanDescription = description?
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return NPOBroadcastDetail(
+            name: name ?? "",
+            description: cleanDescription,
+            presenters: presenters,
+            imageUrl: imageUrl,
+            programmeName: programmeName,
+            programmeUrl: programmeUrl,
+            isRecording: recording,
+            listenBackUrl: listenBackUrl,
+            fragments: fragments
+        )
+    }
+
+    private func parseBroadcastList(html: String) -> [NPOBroadcastListItem] {
+        // Find the __NEXT_DATA__ JSON
+        guard let jsonRange = html.range(of: "\"application/json\""),
+              let scriptStart = html[jsonRange.upperBound...].range(of: ">"),
+              let scriptEnd = html[scriptStart.upperBound...].range(of: "</script>") else {
+            return []
+        }
+
+        let jsonString = String(html[scriptStart.upperBound..<scriptEnd.lowerBound])
+
+        guard let jsonData = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let props = (json["props"] as? [String: Any])?["pageProps"] as? [String: Any],
+              let broadcasts = props["broadcasts"] as? [[String: Any]] else {
+            return []
+        }
+
+        return broadcasts.compactMap { b in
+            guard let title = b["title"] as? String,
+                  let url = b["url"] as? String else { return nil }
+            return NPOBroadcastListItem(
+                title: title,
+                url: url,
+                time: b["time"] as? String,
+                date: b["date"] as? String,
+                imageUrl: b["imageUrl"] as? String
+            )
+        }
+    }
+
     func fetchAllPrograms() async throws -> [NPOProgram] {
         var allPrograms: [NPOProgram] = []
 
@@ -245,6 +397,36 @@ struct NPOTrackAPI: Codable {
     let enddatetime: String?
     let image_url_200x200: String?
     let spotify_url: String?
+}
+
+// MARK: - Broadcast Detail (scraped from uitzendingen pages)
+
+struct NPOBroadcastDetail {
+    let name: String
+    let description: String?
+    let presenters: [String]
+    let imageUrl: String?
+    let programmeName: String?
+    let programmeUrl: String?
+    let isRecording: Bool
+    let listenBackUrl: String?
+    let fragments: [NPOFragment]
+}
+
+struct NPOFragment {
+    let id: String
+    let name: String
+    let imageUrl: String?
+    let type: String?
+    let url: String?
+}
+
+struct NPOBroadcastListItem {
+    let title: String
+    let url: String
+    let time: String?
+    let date: String?
+    let imageUrl: String?
 }
 
 // MARK: - Error Handling

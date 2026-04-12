@@ -181,8 +181,10 @@ struct BroadcastDetailView: View {
     let broadcast: Broadcast
     let channelId: String
 
+    @State private var detail: NPOBroadcastDetail?
     @State private var tracks: [NPOTrackAPI] = []
-    @State private var isLoadingTracks = false
+    @State private var broadcastList: [NPOBroadcastListItem] = []
+    @State private var isLoading = true
 
     private let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -190,31 +192,53 @@ struct BroadcastDetailView: View {
         return f
     }()
 
+    private let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     var endTime: Date {
         broadcast.startTime.addingTimeInterval(Double(broadcast.duration))
+    }
+
+    var broadcastState: BroadcastState {
+        let now = Date()
+        if broadcast.startTime <= now && now <= endTime {
+            return .live
+        } else if endTime < now {
+            return .past
+        } else {
+            return .upcoming
+        }
+    }
+
+    enum BroadcastState {
+        case live, past, upcoming
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Header met afbeelding
-                if let imageUrl = broadcast.image, let url = URL(string: imageUrl) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.cardBg)
-                    }
-                    .frame(height: 200)
-                    .clipped()
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                }
+                // Header afbeelding
+                headerImage
 
-                // Titel en info
+                // Titel en tijden
                 VStack(alignment: .leading, spacing: 8) {
+                    // Show-link (als beschikbaar)
+                    if let programmeName = detail?.programmeName, let programmeUrl = detail?.programmeUrl {
+                        NavigationLink(destination: Text("Show: \(programmeName)")) {
+                            HStack(spacing: 4) {
+                                Text(programmeName)
+                                    .font(.subheadline)
+                                    .foregroundColor(.transistorGreen)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                                    .foregroundColor(.transistorGreen)
+                            }
+                        }
+                    }
+
                     Text(broadcast.displayTitle)
                         .font(.title2)
                         .fontWeight(.bold)
@@ -228,106 +252,64 @@ struct BroadcastDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(.transistorGreen)
 
-                        Label(
-                            "\(broadcast.duration / 60) min",
-                            systemImage: "timer"
-                        )
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                    }
-
-                    if let description = broadcast.description, !description.isEmpty {
-                        Text(description)
-                            .font(.body)
+                        Label("\(broadcast.duration / 60) min", systemImage: "timer")
+                            .font(.subheadline)
                             .foregroundColor(.gray)
                     }
 
-                    if isNow {
-                        Label("Nu op de radio", systemImage: "antenna.radiowaves.left.and.right")
+                    // Presentatoren
+                    if let detail, !detail.presenters.isEmpty {
+                        Label(detail.presenters.joined(separator: ", "), systemImage: "person.2")
                             .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.transistorGreen)
-                            .padding(.top, 4)
+                            .foregroundColor(.gray)
+                    } else if let desc = broadcast.description, !desc.isEmpty {
+                        Label(desc, systemImage: "person.2")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
                     }
                 }
                 .padding(.horizontal)
 
-                // Luister-knop
-                if let audioUrl = broadcast.audioUrl, let _ = URL(string: audioUrl) {
-                    Button(action: {
-                        // TODO: start playback via AudioPlayerService
-                    }) {
-                        HStack {
-                            Image(systemName: "play.fill")
-                            Text("Luister live")
-                        }
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.transistorGreen)
-                        .cornerRadius(12)
+                // CTA
+                ctaButton
+                    .padding(.horizontal)
+
+                // Beschrijving
+                if let description = detail?.description, !description.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Over deze uitzending")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Text(description)
+                            .font(.body)
+                            .foregroundColor(.gray)
                     }
                     .padding(.horizontal)
                 }
 
-                // Gespeelde tracks
+                // Fragmenten
+                if let detail, !detail.fragments.isEmpty {
+                    fragmentsSection(detail.fragments)
+                }
+
+                // Tracks
                 if !tracks.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Gespeelde muziek")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal)
+                    tracksSection
+                }
 
-                        ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                            HStack(spacing: 12) {
-                                if let imageUrl = track.image_url_200x200, let url = URL(string: imageUrl) {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Rectangle().fill(Color.cardBg)
-                                    }
-                                    .frame(width: 44, height: 44)
-                                    .cornerRadius(6)
-                                } else {
-                                    Image(systemName: "music.note")
-                                        .frame(width: 44, height: 44)
-                                        .background(Color.cardBg)
-                                        .cornerRadius(6)
-                                        .foregroundColor(.gray)
-                                }
+                // Andere uitzendingen van dit programma
+                if !broadcastList.isEmpty {
+                    otherBroadcastsSection
+                }
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(track.title ?? "Onbekend")
-                                        .font(.subheadline)
-                                        .foregroundColor(.white)
-                                    Text(track.artist ?? "Onbekend")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-
-                                Spacer()
-
-                                if let start = track.startdatetime {
-                                    let parsed = parseTime(start)
-                                    if let parsed {
-                                        Text(timeFormatter.string(from: parsed))
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding(.top, 8)
-                } else if isLoadingTracks {
+                if isLoading {
                     HStack {
                         ProgressView().tint(.transistorGreen)
-                        Text("Tracks laden...")
+                        Text("Details laden...")
                             .foregroundColor(.gray)
                     }
-                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity)
+                    .padding()
                 }
             }
             .padding(.vertical)
@@ -336,21 +318,293 @@ struct BroadcastDetailView: View {
         .navigationTitle(broadcast.displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            Task { await loadTracks() }
+            Task { await loadAll() }
         }
     }
 
-    private var isNow: Bool {
-        let now = Date()
-        return broadcast.startTime <= now && now <= endTime
+    // MARK: - Header
+
+    private var headerImage: some View {
+        Group {
+            let imageUrl = detail?.imageUrl ?? broadcast.image
+            if let imageUrl, let url = URL(string: imageUrl) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle().fill(Color.cardBg)
+                }
+                .frame(height: 220)
+                .clipped()
+                .cornerRadius(12)
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    // MARK: - Smart CTA
+
+    @ViewBuilder
+    private var ctaButton: some View {
+        switch broadcastState {
+        case .live:
+            Button(action: { /* TODO: AudioPlayerService */ }) {
+                HStack {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                    Text("Luister live")
+                }
+                .font(.headline)
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.transistorGreen)
+                .cornerRadius(12)
+            }
+
+        case .past:
+            if let listenBackUrl = detail?.listenBackUrl, !listenBackUrl.isEmpty {
+                Button(action: { /* TODO: AudioPlayerService met listenBackUrl */ }) {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("Luister terug")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.transistorGreen)
+                    .cornerRadius(12)
+                }
+            } else if detail?.isRecording == false {
+                HStack {
+                    Image(systemName: "xmark.circle")
+                    Text("Niet beschikbaar als terugluisteren")
+                }
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.cardBg)
+                .cornerRadius(12)
+            } else {
+                // Still loading or no detail yet
+                HStack {
+                    Image(systemName: "clock")
+                    Text("Terugluisteren wordt voorbereid...")
+                }
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.cardBg)
+                .cornerRadius(12)
+            }
+
+        case .upcoming:
+            Button(action: { /* TODO: schedule local notification */ }) {
+                HStack {
+                    Image(systemName: "bell")
+                    Text("Herinner mij")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.cardBg)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.transistorGreen, lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    // MARK: - Fragmenten
+
+    private func fragmentsSection(_ fragments: [NPOFragment]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Fragmenten")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+
+            ForEach(fragments, id: \.id) { fragment in
+                HStack(spacing: 12) {
+                    if let imageUrl = fragment.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle().fill(Color.cardBg)
+                        }
+                        .frame(width: 60, height: 60)
+                        .cornerRadius(8)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(fragment.name)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+
+                        if let type = fragment.type {
+                            Text(type.capitalized)
+                                .font(.caption)
+                                .foregroundColor(.transistorGreen)
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "play.circle")
+                        .foregroundColor(.transistorGreen)
+                        .font(.title3)
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Tracks
+
+    private var tracksSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Gespeelde muziek")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+
+            ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
+                HStack(spacing: 12) {
+                    if let imageUrl = track.image_url_200x200, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle().fill(Color.cardBg)
+                        }
+                        .frame(width: 44, height: 44)
+                        .cornerRadius(6)
+                    } else {
+                        Image(systemName: "music.note")
+                            .frame(width: 44, height: 44)
+                            .background(Color.cardBg)
+                            .cornerRadius(6)
+                            .foregroundColor(.gray)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(track.title ?? "Onbekend")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                        Text(track.artist ?? "Onbekend")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+
+                    Spacer()
+
+                    if let start = track.startdatetime, let parsed = parseTime(start) {
+                        Text(timeFormatter.string(from: parsed))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Andere uitzendingen
+
+    private var otherBroadcastsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Andere uitzendingen")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+
+            ForEach(broadcastList.prefix(5), id: \.url) { item in
+                HStack(spacing: 12) {
+                    if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle().fill(Color.cardBg)
+                        }
+                        .frame(width: 50, height: 50)
+                        .cornerRadius(6)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+
+                        HStack(spacing: 8) {
+                            if let date = item.date {
+                                Text(date)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            if let time = item.time {
+                                Text(time)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Data loading
+
+    private func loadAll() async {
+        isLoading = true
+
+        async let detailTask: () = loadDetail()
+        async let tracksTask: () = loadTracks()
+        async let listTask: () = loadBroadcastList()
+
+        await detailTask
+        await tracksTask
+        await listTask
+
+        isLoading = false
+    }
+
+    private func loadDetail() async {
+        guard !channelId.isEmpty else { return }
+
+        // First get the broadcast list to find the URL for this broadcast
+        do {
+            let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
+            // Match by title
+            if let match = list.first(where: { $0.title.hasPrefix(broadcast.displayTitle) }) {
+                detail = try await NPOAPIService.shared.fetchBroadcastDetail(
+                    forChannel: channelId,
+                    broadcastUrl: match.url
+                )
+                // Also store the list for "andere uitzendingen"
+                broadcastList = list.filter { $0.title != match.title }
+            }
+        } catch {
+            print("Error loading broadcast detail: \(error)")
+        }
     }
 
     private func loadTracks() async {
         guard !channelId.isEmpty else { return }
-        isLoadingTracks = true
         do {
             let allTracks = try await NPOAPIService.shared.fetchTracks(forChannel: channelId)
-            // Filter tracks die binnen deze uitzending vallen
             tracks = allTracks.filter { track in
                 guard let startStr = track.startdatetime, let trackStart = parseTime(startStr) else { return false }
                 return trackStart >= broadcast.startTime && trackStart <= endTime
@@ -358,7 +612,18 @@ struct BroadcastDetailView: View {
         } catch {
             print("Error loading tracks: \(error)")
         }
-        isLoadingTracks = false
+    }
+
+    private func loadBroadcastList() async {
+        guard !channelId.isEmpty, broadcastList.isEmpty else { return }
+        do {
+            let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
+            if broadcastList.isEmpty {
+                broadcastList = list.filter { !$0.title.hasPrefix(broadcast.displayTitle) }
+            }
+        } catch {
+            print("Error loading broadcast list: \(error)")
+        }
     }
 
     private func parseTime(_ str: String) -> Date? {
