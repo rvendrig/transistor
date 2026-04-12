@@ -4,7 +4,7 @@ import Foundation
 class ContentViewModel: ObservableObject {
     // MARK: - Content Properties
     @Published var channels: [Channel] = []
-    @Published var programs: [Program] = []
+    @Published var shows: [Show] = []
     @Published var broadcasts: [Broadcast] = []
     @Published var episodes: [Episode] = []
 
@@ -14,8 +14,12 @@ class ContentViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     // MARK: - Provider Management
-    @Published var selectedProviders: Set<String> = ["npo"]
+    @Published var selectedProviders: Set<String>
     let providerStore = ProviderStore.shared
+
+    init() {
+        self.selectedProviders = ProviderStore.shared.activeProviders
+    }
 
     // MARK: - Playlist properties
     @Published var playlists: [Playlist] = []
@@ -42,7 +46,7 @@ class ContentViewModel: ObservableObject {
     @Published var listeningSessionError: String?
 
     // MARK: - Search
-    @Published var searchResults: UnifiedSearchResult = UnifiedSearchResult(programs: [], broadcasts: [], episodes: [])
+    @Published var searchResults: UnifiedSearchResult = UnifiedSearchResult(shows: [], broadcasts: [], episodes: [])
     @Published var isSearching = false
 
     private let dbService = DatabaseService.shared
@@ -69,8 +73,8 @@ class ContentViewModel: ObservableObject {
         isLoadingChannels = false
     }
 
-    // MARK: - Programs Loading
-    func loadPrograms(forChannel channel: Channel) async {
+    // MARK: - Shows Loading
+    func loadShows(forChannel channel: Channel) async {
         isLoading = true
         errorMessage = nil
 
@@ -81,28 +85,28 @@ class ContentViewModel: ObservableObject {
         }
 
         do {
-            programs = try await provider.fetchPrograms(forChannel: channel.id)
+            shows = try await provider.fetchShows(forChannel: channel.id)
         } catch {
-            errorMessage = "Failed to load programs: \(error.localizedDescription)"
-            programs = []
+            errorMessage = "Failed to load shows: \(error.localizedDescription)"
+            shows = []
         }
 
         isLoading = false
     }
 
     // MARK: - Broadcasts Loading
-    func loadBroadcasts(forProgram program: Program) async {
+    func loadBroadcasts(forShow show: Show) async {
         isLoading = true
         errorMessage = nil
 
-        guard let provider = providerStore.provider(byId: program.providerId) else {
+        guard let provider = providerStore.provider(byId: show.providerId) else {
             errorMessage = "Provider not found"
             isLoading = false
             return
         }
 
         do {
-            broadcasts = try await provider.fetchBroadcasts(forProgram: program.id)
+            broadcasts = try await provider.fetchBroadcasts(forShow: show.id)
         } catch {
             errorMessage = "Failed to load broadcasts: \(error.localizedDescription)"
             broadcasts = []
@@ -126,14 +130,14 @@ class ContentViewModel: ObservableObject {
     // MARK: - Unified Search
     func search(_ query: String) async {
         guard !query.isEmpty else {
-            searchResults = UnifiedSearchResult(programs: [], broadcasts: [], episodes: [])
+            searchResults = UnifiedSearchResult(shows: [], broadcasts: [], episodes: [])
             return
         }
 
         isSearching = true
         errorMessage = nil
 
-        var allPrograms: [Program] = []
+        var allShows: [Show] = []
         var allBroadcasts: [Broadcast] = []
         var allEpisodes: [Episode] = []
 
@@ -144,8 +148,8 @@ class ContentViewModel: ObservableObject {
                 let results = try await provider.search(query)
 
                 for result in results {
-                    if let program = result as? Program {
-                        allPrograms.append(program)
+                    if let show = result as? Show {
+                        allShows.append(show)
                     } else if let broadcast = result as? Broadcast {
                         allBroadcasts.append(broadcast)
                     } else if let episode = result as? Episode {
@@ -158,7 +162,7 @@ class ContentViewModel: ObservableObject {
         }
 
         searchResults = UnifiedSearchResult(
-            programs: allPrograms,
+            shows: allShows,
             broadcasts: allBroadcasts,
             episodes: allEpisodes
         )
@@ -179,18 +183,103 @@ class ContentViewModel: ObservableObject {
     }
 
     // MARK: - Playlist Methods (same as before but updated for generic content)
-    func loadPlaylists() {
+
+    func renamePlaylist(_ playlistId: String, newName: String) {
+        playlistError = nil
+
+        guard !newName.trimmingCharacters(in: .whitespaces).isEmpty else {
+            playlistError = "Playlist name cannot be empty"
+            return
+        }
+
+        if dbService.updatePlaylistName(playlistId, newName: newName) {
+            if let index = playlists.firstIndex(where: { $0.id == playlistId }) {
+                playlists[index] = Playlist(
+                    id: playlistId,
+                    name: newName,
+                    description: playlists[index].description,
+                    createdAt: playlists[index].createdAt,
+                    itemCount: playlists[index].itemCount
+                )
+            }
+            if selectedPlaylist?.id == playlistId {
+                selectedPlaylist = Playlist(
+                    id: playlistId,
+                    name: newName,
+                    description: selectedPlaylist?.description,
+                    createdAt: selectedPlaylist?.createdAt ?? Date(),
+                    itemCount: selectedPlaylist?.itemCount ?? 0
+                )
+            }
+        } else {
+            playlistError = "Failed to rename playlist"
+        }
+    }
+
+    func loadPlaylistItems(_ playlistId: String) {
         isLoadingPlaylists = true
         playlistError = nil
 
-        do {
-            playlists = dbService.getAllPlaylists()
-            isLoadingPlaylists = false
-        } catch {
-            playlistError = "Failed to load playlists"
-            isLoadingPlaylists = false
-            print("Error loading playlists: \(error.localizedDescription)")
+        playlistItems = dbService.getPlaylistItems(playlistId)
+        isLoadingPlaylists = false
+    }
+
+    func addToPlaylist(playlistId: String, itemId: String, type: PlaylistItemType, showId: String? = nil) {
+        playlistError = nil
+
+        // Check if item already exists in playlist
+        if dbService.isItemInPlaylist(playlistId, itemId) {
+            playlistError = "Item already in playlist"
+            return
         }
+
+        if dbService.addItemToPlaylist(playlistId: playlistId, itemId: itemId, itemType: type, showId: showId) {
+            // Update playlist item count
+            if let index = playlists.firstIndex(where: { $0.id == playlistId }) {
+                let newCount = playlists[index].itemCount + 1
+                playlists[index] = Playlist(
+                    id: playlists[index].id,
+                    name: playlists[index].name,
+                    description: playlists[index].description,
+                    createdAt: playlists[index].createdAt,
+                    itemCount: newCount
+                )
+            }
+            // Reload items if this is the selected playlist
+            if selectedPlaylist?.id == playlistId {
+                loadPlaylistItems(playlistId)
+            }
+        } else {
+            playlistError = "Failed to add item to playlist"
+        }
+    }
+
+    func removeFromPlaylist(_ playlistId: String, _ itemId: String) {
+        playlistError = nil
+
+        if dbService.removeItemFromPlaylist(playlistId, itemId) {
+            playlistItems.removeAll { $0.itemId == itemId }
+            // Update playlist item count
+            if let index = playlists.firstIndex(where: { $0.id == playlistId }) {
+                let newCount = max(0, playlists[index].itemCount - 1)
+                playlists[index] = Playlist(
+                    id: playlists[index].id,
+                    name: playlists[index].name,
+                    description: playlists[index].description,
+                    createdAt: playlists[index].createdAt,
+                    itemCount: newCount
+                )
+            }
+        } else {
+            playlistError = "Failed to remove item from playlist"
+        }
+    }
+
+    func loadPlaylists() {
+        isLoadingPlaylists = true
+        playlistError = nil
+        playlists = dbService.getAllPlaylists()
+        isLoadingPlaylists = false
     }
 
     func createPlaylist(name: String, description: String? = nil) {
@@ -259,15 +348,9 @@ class ContentViewModel: ObservableObject {
     func loadFavorites() {
         isLoadingFavorites = true
         favoriteError = nil
-
-        do {
-            favorites = dbService.getAllFavorites()
-            isFavoritedContent = Set(favorites.map { $0.contentId })
-            isLoadingFavorites = false
-        } catch {
-            favoriteError = "Failed to load favorites"
-            isLoadingFavorites = false
-        }
+        favorites = dbService.getAllFavorites()
+        isFavoritedContent = Set(favorites.map { $0.contentId })
+        isLoadingFavorites = false
     }
 
     func toggleFavorite(contentId: String, contentType: ContentType, providerId: String) {
@@ -300,15 +383,8 @@ class ContentViewModel: ObservableObject {
     func loadListeningHistory(limit: Int = 50) {
         isLoadingListeningHistory = true
         listeningSessionError = nil
-
-        do {
-            listeningHistory = dbService.getListeningHistory(limit: limit)
-            isLoadingListeningHistory = false
-        } catch {
-            listeningSessionError = "Failed to load listening history"
-            isLoadingListeningHistory = false
-            print("Error loading listening history: \(error.localizedDescription)")
-        }
+        listeningHistory = dbService.getListeningHistory(limit: limit)
+        isLoadingListeningHistory = false
     }
 
     func startListeningSession(contentId: String, contentType: ContentType, providerId: String, title: String, source: String, duration: Int, categories: [ContentCategory] = [], topics: [String] = [], guests: [String] = [], artists: [String] = []) {

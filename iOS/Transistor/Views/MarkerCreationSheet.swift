@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct MarkerCreationSheet: View {
-    @ObservedObject var viewModel: NPOViewModel
-    let broadcastId: String
+    @ObservedObject var viewModel: ContentViewModel
+    let contentId: String
+    let contentType: ContentType
+    let providerId: String
     let currentTimestamp: Int // in seconds
     @Binding var isPresented: Bool
 
@@ -101,7 +103,7 @@ struct MarkerCreationSheet: View {
 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        viewModel.createMarker(broadcastId: broadcastId, timestamp: currentTimestamp, tags: tags)
+                        viewModel.createMarker(contentId: contentId, contentType: contentType, providerId: providerId, timestamp: currentTimestamp, tags: tags)
                         isPresented = false
                     }) {
                         Text("Create")
@@ -119,10 +121,12 @@ struct MarkerCreationSheet: View {
 
 #Preview {
     @State var isPresented = true
-    let viewModel = NPOViewModel()
+    let viewModel = ContentViewModel()
     return MarkerCreationSheet(
         viewModel: viewModel,
-        broadcastId: "test-id",
+        contentId: "test-id",
+        contentType: .broadcast,
+        providerId: "npo",
         currentTimestamp: 120,
         isPresented: $isPresented
     )

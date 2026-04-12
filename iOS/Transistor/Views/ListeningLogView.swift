@@ -245,7 +245,7 @@ struct ListeningSessionDetailView: View {
                     }
 
                     Text(session.source)
-                        .font(.subheading)
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
 
                     HStack {

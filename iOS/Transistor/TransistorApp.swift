@@ -4,11 +4,15 @@ import SwiftUI
 struct TransistorApp: App {
     @StateObject private var viewModel = ContentViewModel()
 
+    init() {
+        ProviderStore.shared.registerProvider(NPOProvider())
+    }
+
     var body: some Scene {
         WindowGroup {
             TabView {
-                // NPO/Channels Navigation
-                NPOChannelsViewV2()
+                // Browse Channels
+                BrowseView()
                     .tabItem {
                         Label("Browse", systemImage: "square.grid.2x2")
                     }

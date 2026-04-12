@@ -1,6 +1,8 @@
 import Foundation
 import SQLite3
 
+private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 class DatabaseService {
     static let shared = DatabaseService()
 
@@ -25,53 +27,96 @@ class DatabaseService {
     }
 
     private func createTables() {
-        let createChannelsTable = """
-        CREATE TABLE IF NOT EXISTS npo_channels (
+        let createNetworksTable = """
+        CREATE TABLE IF NOT EXISTS networks (
             id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            titles TEXT,
+            description TEXT,
+            logo TEXT
+        )
+        """
+
+        let createChannelsTable = """
+        CREATE TABLE IF NOT EXISTS channels (
+            id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL,
+            network_id TEXT,
+            titles TEXT,
             description TEXT,
             logo_url TEXT
         )
         """
 
-        let createProgramsTable = """
-        CREATE TABLE IF NOT EXISTS npo_programs (
+        let createShowsTable = """
+        CREATE TABLE IF NOT EXISTS shows (
             id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            titles TEXT,
             description TEXT,
             presenters TEXT,
             image TEXT,
             genre TEXT,
-            channel_id TEXT,
-            FOREIGN KEY(channel_id) REFERENCES npo_channels(id)
+            channel_ids TEXT
+        )
+        """
+
+        let createSeasonsTable = """
+        CREATE TABLE IF NOT EXISTS seasons (
+            id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL,
+            show_id TEXT,
+            titles TEXT,
+            season_number INTEGER,
+            description TEXT
         )
         """
 
         let createBroadcastsTable = """
-        CREATE TABLE IF NOT EXISTS npo_broadcasts (
+        CREATE TABLE IF NOT EXISTS broadcasts (
             id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL,
             title TEXT NOT NULL,
-            program_id TEXT NOT NULL,
+            show_id TEXT,
+            channel_id TEXT,
+            season_id TEXT,
             start_time TEXT NOT NULL,
             duration INTEGER,
             description TEXT,
             image TEXT,
-            FOREIGN KEY(program_id) REFERENCES npo_programs(id)
+            audio_url TEXT,
+            title_override TEXT
         )
         """
 
-        let createItemsTable = """
-        CREATE TABLE IF NOT EXISTS npo_items (
+        let createSegmentsTable = """
+        CREATE TABLE IF NOT EXISTS segments (
             id TEXT PRIMARY KEY,
-            broadcast_id TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            parent_id TEXT NOT NULL,
+            parent_type TEXT NOT NULL,
             title TEXT NOT NULL,
             description TEXT,
-            type TEXT,
+            segment_type TEXT,
             duration INTEGER,
-            guests TEXT,
+            persons TEXT,
             topics TEXT,
             start_offset INTEGER,
-            FOREIGN KEY(broadcast_id) REFERENCES npo_broadcasts(id)
+            image TEXT
+        )
+        """
+
+        let createClipsTable = """
+        CREATE TABLE IF NOT EXISTS clips (
+            id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL,
+            source_id TEXT,
+            source_type TEXT,
+            title TEXT,
+            description TEXT,
+            start_offset INTEGER,
+            duration INTEGER,
+            audio_url TEXT
         )
         """
 
@@ -104,7 +149,7 @@ class DatabaseService {
             id TEXT PRIMARY KEY,
             program_id TEXT NOT NULL,
             subscribed_at TEXT,
-            FOREIGN KEY(program_id) REFERENCES npo_programs(id)
+            FOREIGN KEY(program_id) REFERENCES shows(id)
         )
         """
 
@@ -124,8 +169,8 @@ class DatabaseService {
             playlist_id TEXT NOT NULL,
             item_id TEXT NOT NULL,
             item_type TEXT NOT NULL,
-            broadcast_id TEXT,
-            program_id TEXT,
+            show_id TEXT,
+            provider_id TEXT,
             position INTEGER NOT NULL,
             added_at TEXT NOT NULL,
             FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
@@ -204,10 +249,13 @@ class DatabaseService {
         """
 
         for createTableSQL in [
+            createNetworksTable,
             createChannelsTable,
-            createProgramsTable,
+            createShowsTable,
+            createSeasonsTable,
             createBroadcastsTable,
-            createItemsTable,
+            createSegmentsTable,
+            createClipsTable,
             createPodcastFeedsTable,
             createPodcastEpisodesTable,
             createSubscriptionsTable,
@@ -232,21 +280,52 @@ class DatabaseService {
         }
     }
 
+    // MARK: - JSON Helpers
+
+    private func encodeTitles(_ titles: [TitledPeriod]) -> String? {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(titles) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func decodeTitles(_ json: String?) -> [TitledPeriod] {
+        guard let json = json, let data = json.data(using: .utf8) else { return [] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (try? decoder.decode([TitledPeriod].self, from: data)) ?? []
+    }
+
+    private func encodeStringArray(_ array: [String]) -> String? {
+        guard let data = try? JSONSerialization.data(withJSONObject: array) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func decodeStringArray(_ json: String?) -> [String] {
+        guard let json = json, let data = json.data(using: .utf8),
+              let parsed = try? JSONSerialization.jsonObject(with: data) as? [String] else { return [] }
+        return parsed
+    }
+
     // MARK: - Channel Operations
 
-    func saveChannel(_ channel: NPOChannel) {
+    func saveChannel(_ channel: Channel) {
         let query = """
-        INSERT OR REPLACE INTO npo_channels (id, name, description, logo_url)
-        VALUES (?, ?, ?, ?)
+        INSERT OR REPLACE INTO channels (id, provider_id, network_id, titles, description, logo_url)
+        VALUES (?, ?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_text(statement, 1, channel.id, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 2, channel.name, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 3, channel.description, -1, SQLITE_TRANSIENT)
-            if let logoURL = channel.logoURL {
-                sqlite3_bind_text(statement, 4, logoURL, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, channel.providerId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, channel.networkId, -1, SQLITE_TRANSIENT)
+            if let titlesJSON = encodeTitles(channel.titles) {
+                sqlite3_bind_text(statement, 4, titlesJSON, -1, SQLITE_TRANSIENT)
+            }
+            sqlite3_bind_text(statement, 5, channel.description, -1, SQLITE_TRANSIENT)
+            if let logo = channel.logo {
+                sqlite3_bind_text(statement, 6, logo, -1, SQLITE_TRANSIENT)
             }
 
             if sqlite3_step(statement) != SQLITE_DONE {
@@ -256,37 +335,39 @@ class DatabaseService {
         sqlite3_finalize(statement)
     }
 
-    // MARK: - Program Operations
+    // MARK: - Show Operations
 
-    func saveProgram(_ program: NPOProgram) {
+    func saveShow(_ show: Show) {
         let query = """
-        INSERT OR REPLACE INTO npo_programs (id, title, description, presenters, image, genre, channel_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO shows (id, provider_id, titles, description, presenters, image, genre, channel_ids)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, program.id, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 2, program.title, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 3, program.description, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, show.id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, show.providerId, -1, SQLITE_TRANSIENT)
+            if let titlesJSON = encodeTitles(show.titles) {
+                sqlite3_bind_text(statement, 3, titlesJSON, -1, SQLITE_TRANSIENT)
+            }
+            sqlite3_bind_text(statement, 4, show.description, -1, SQLITE_TRANSIENT)
 
-            let presentersJSON = try? JSONSerialization.data(withJSONObject: program.presenters)
-            if let data = presentersJSON {
-                sqlite3_bind_blob(statement, 4, (data as NSData).bytes, Int32(data.count), SQLITE_TRANSIENT)
+            if let presentersJSON = encodeStringArray(show.presenters) {
+                sqlite3_bind_text(statement, 5, presentersJSON, -1, SQLITE_TRANSIENT)
             }
 
-            if let image = program.image {
-                sqlite3_bind_text(statement, 5, image, -1, SQLITE_TRANSIENT)
+            if let image = show.image {
+                sqlite3_bind_text(statement, 6, image, -1, SQLITE_TRANSIENT)
             }
-            if let genre = program.genre {
-                sqlite3_bind_text(statement, 6, genre, -1, SQLITE_TRANSIENT)
+            if let genre = show.genre {
+                sqlite3_bind_text(statement, 7, genre, -1, SQLITE_TRANSIENT)
             }
-            if let channelId = program.channelId {
-                sqlite3_bind_text(statement, 7, channelId, -1, SQLITE_TRANSIENT)
+            if let channelIds = show.channelIds, let channelIdsJSON = encodeStringArray(channelIds) {
+                sqlite3_bind_text(statement, 8, channelIdsJSON, -1, SQLITE_TRANSIENT)
             }
 
             if sqlite3_step(statement) != SQLITE_DONE {
-                print("Error saving program")
+                print("Error saving show")
             }
         }
         sqlite3_finalize(statement)
@@ -294,29 +375,44 @@ class DatabaseService {
 
     // MARK: - Broadcast Operations
 
-    func saveBroadcast(_ broadcast: NPOBroadcast) {
+    func saveBroadcast(_ broadcast: Broadcast) {
         let query = """
-        INSERT OR REPLACE INTO npo_broadcasts (id, title, program_id, start_time, duration, description, image)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO broadcasts (id, provider_id, title, show_id, channel_id, season_id, start_time, duration, description, image, audio_url, title_override)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_text(statement, 1, broadcast.id, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 2, broadcast.title, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 3, broadcast.programId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, broadcast.providerId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, broadcast.title, -1, SQLITE_TRANSIENT)
+            if let showId = broadcast.showId {
+                sqlite3_bind_text(statement, 4, showId, -1, SQLITE_TRANSIENT)
+            }
+            if let channelId = broadcast.channelId {
+                sqlite3_bind_text(statement, 5, channelId, -1, SQLITE_TRANSIENT)
+            }
+            if let seasonId = broadcast.seasonId {
+                sqlite3_bind_text(statement, 6, seasonId, -1, SQLITE_TRANSIENT)
+            }
 
             let dateFormatter = ISO8601DateFormatter()
             let dateString = dateFormatter.string(from: broadcast.startTime)
-            sqlite3_bind_text(statement, 4, dateString, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 7, dateString, -1, SQLITE_TRANSIENT)
 
-            sqlite3_bind_int(statement, 5, Int32(broadcast.duration))
+            sqlite3_bind_int(statement, 8, Int32(broadcast.duration))
 
             if let description = broadcast.description {
-                sqlite3_bind_text(statement, 6, description, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 9, description, -1, SQLITE_TRANSIENT)
             }
             if let image = broadcast.image {
-                sqlite3_bind_text(statement, 7, image, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(statement, 10, image, -1, SQLITE_TRANSIENT)
+            }
+            if let audioUrl = broadcast.audioUrl {
+                sqlite3_bind_text(statement, 11, audioUrl, -1, SQLITE_TRANSIENT)
+            }
+            if let titleOverride = broadcast.titleOverride {
+                sqlite3_bind_text(statement, 12, titleOverride, -1, SQLITE_TRANSIENT)
             }
 
             if sqlite3_step(statement) != SQLITE_DONE {
@@ -326,33 +422,62 @@ class DatabaseService {
         sqlite3_finalize(statement)
     }
 
-    func getBroadcastsByProgram(_ programId: String) -> [NPOBroadcast] {
-        var broadcasts: [NPOBroadcast] = []
-        let query = "SELECT id, title, program_id, start_time, duration, description, image FROM npo_broadcasts WHERE program_id = ?"
+    /// Convenience wrapper: saves an NPOBroadcast by converting to generic Broadcast
+    func saveBroadcast(_ broadcast: NPOBroadcast) {
+        let generic = Broadcast(
+            id: broadcast.id,
+            providerId: "npo",
+            title: broadcast.title,
+            showId: broadcast.programId,
+            channelId: nil,
+            seasonId: nil,
+            startTime: broadcast.startTime,
+            duration: broadcast.duration,
+            description: broadcast.description,
+            image: broadcast.image,
+            audioUrl: broadcast.audioUrl,
+            titleOverride: nil
+        )
+        saveBroadcast(generic)
+    }
+
+    func getBroadcastsByShow(_ showId: String) -> [Broadcast] {
+        var broadcasts: [Broadcast] = []
+        let query = "SELECT id, provider_id, title, show_id, channel_id, season_id, start_time, duration, description, image, audio_url, title_override FROM broadcasts WHERE show_id = ?"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, programId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, showId, -1, SQLITE_TRANSIENT)
 
             let dateFormatter = ISO8601DateFormatter()
             while sqlite3_step(statement) == SQLITE_ROW {
                 let id = String(cString: sqlite3_column_text(statement, 0))
-                let title = String(cString: sqlite3_column_text(statement, 1))
-                let programId = String(cString: sqlite3_column_text(statement, 2))
-                let dateString = String(cString: sqlite3_column_text(statement, 3))
-                let duration = Int(sqlite3_column_int(statement, 4))
-                let description = sqlite3_column_text(statement, 5).map { String(cString: $0) }
-                let image = sqlite3_column_text(statement, 6).map { String(cString: $0) }
+                let providerId = String(cString: sqlite3_column_text(statement, 1))
+                let title = String(cString: sqlite3_column_text(statement, 2))
+                let showId = sqlite3_column_text(statement, 3).map { String(cString: $0) }
+                let channelId = sqlite3_column_text(statement, 4).map { String(cString: $0) }
+                let seasonId = sqlite3_column_text(statement, 5).map { String(cString: $0) }
+                let dateString = String(cString: sqlite3_column_text(statement, 6))
+                let duration = Int(sqlite3_column_int(statement, 7))
+                let description = sqlite3_column_text(statement, 8).map { String(cString: $0) }
+                let image = sqlite3_column_text(statement, 9).map { String(cString: $0) }
+                let audioUrl = sqlite3_column_text(statement, 10).map { String(cString: $0) }
+                let titleOverride = sqlite3_column_text(statement, 11).map { String(cString: $0) }
 
                 if let startTime = dateFormatter.date(from: dateString) {
-                    let broadcast = NPOBroadcast(
+                    let broadcast = Broadcast(
                         id: id,
+                        providerId: providerId,
                         title: title,
-                        programId: programId,
+                        showId: showId,
+                        channelId: channelId,
+                        seasonId: seasonId,
                         startTime: startTime,
                         duration: duration,
                         description: description,
-                        image: image
+                        image: image,
+                        audioUrl: audioUrl,
+                        titleOverride: titleOverride
                     )
                     broadcasts.append(broadcast)
                 }
@@ -362,97 +487,92 @@ class DatabaseService {
         return broadcasts
     }
 
-    // MARK: - Item Operations
+    // MARK: - Segment Operations
 
-    func saveItem(_ item: NPOItem) {
+    func saveSegment(_ segment: Segment) {
         let query = """
-        INSERT OR REPLACE INTO npo_items (id, broadcast_id, title, description, type, duration, guests, topics, start_offset)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO segments (id, provider_id, parent_id, parent_type, title, description, segment_type, duration, persons, topics, start_offset, image)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, item.id, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 2, item.broadcastId, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(statement, 3, item.title, -1, SQLITE_TRANSIENT)
-            if let description = item.description {
-                sqlite3_bind_text(statement, 4, description, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, segment.id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, segment.providerId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, segment.parentId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, segment.parentType.rawValue, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 5, segment.title, -1, SQLITE_TRANSIENT)
+            if let description = segment.description {
+                sqlite3_bind_text(statement, 6, description, -1, SQLITE_TRANSIENT)
             }
-            sqlite3_bind_text(statement, 5, item.type.rawValue, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_int(statement, 6, Int32(item.duration))
+            sqlite3_bind_text(statement, 7, segment.segmentType.rawValue, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int(statement, 8, Int32(segment.duration))
 
-            if let guestsJSON = try? JSONSerialization.data(withJSONObject: item.guests) {
-                sqlite3_bind_blob(statement, 7, (guestsJSON as NSData).bytes, Int32(guestsJSON.count), SQLITE_TRANSIENT)
+            if let personsJSON = encodeStringArray(segment.persons) {
+                sqlite3_bind_text(statement, 9, personsJSON, -1, SQLITE_TRANSIENT)
+            }
+            if let topicsJSON = encodeStringArray(segment.topics) {
+                sqlite3_bind_text(statement, 10, topicsJSON, -1, SQLITE_TRANSIENT)
             }
 
-            if let topicsJSON = try? JSONSerialization.data(withJSONObject: item.topics) {
-                sqlite3_bind_blob(statement, 8, (topicsJSON as NSData).bytes, Int32(topicsJSON.count), SQLITE_TRANSIENT)
-            }
+            sqlite3_bind_int(statement, 11, Int32(segment.startOffset))
 
-            if let startOffset = item.startOffset {
-                sqlite3_bind_int(statement, 9, Int32(startOffset))
+            if let image = segment.image {
+                sqlite3_bind_text(statement, 12, image, -1, SQLITE_TRANSIENT)
             }
 
             if sqlite3_step(statement) != SQLITE_DONE {
-                print("Error saving item")
+                print("Error saving segment")
             }
         }
         sqlite3_finalize(statement)
     }
 
-    func getItemsByBroadcast(_ broadcastId: String) -> [NPOItem] {
-        var items: [NPOItem] = []
-        let query = "SELECT id, broadcast_id, title, description, type, duration, guests, topics, start_offset FROM npo_items WHERE broadcast_id = ?"
+    func getSegmentsByParent(_ parentId: String) -> [Segment] {
+        var segments: [Segment] = []
+        let query = "SELECT id, provider_id, parent_id, parent_type, title, description, segment_type, duration, persons, topics, start_offset, image FROM segments WHERE parent_id = ? ORDER BY start_offset ASC"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 1, parentId, -1, SQLITE_TRANSIENT)
 
             while sqlite3_step(statement) == SQLITE_ROW {
                 let id = String(cString: sqlite3_column_text(statement, 0))
-                let broadcastId = String(cString: sqlite3_column_text(statement, 1))
-                let title = String(cString: sqlite3_column_text(statement, 2))
-                let description = sqlite3_column_text(statement, 3).map { String(cString: $0) }
-                let typeString = String(cString: sqlite3_column_text(statement, 4))
-                let type = NPOItem.ItemType(rawValue: typeString) ?? .segment
-                let duration = Int(sqlite3_column_int(statement, 5))
+                let providerId = String(cString: sqlite3_column_text(statement, 1))
+                let parentId = String(cString: sqlite3_column_text(statement, 2))
+                let parentTypeString = String(cString: sqlite3_column_text(statement, 3))
+                let parentType = ContentType(rawValue: parentTypeString) ?? .broadcast
+                let title = String(cString: sqlite3_column_text(statement, 4))
+                let description = sqlite3_column_text(statement, 5).map { String(cString: $0) }
+                let segmentTypeString = sqlite3_column_text(statement, 6).map { String(cString: $0) } ?? "other"
+                let segmentType = SegmentType(rawValue: segmentTypeString) ?? .other
+                let duration = Int(sqlite3_column_int(statement, 7))
+                let personsStr = sqlite3_column_text(statement, 8).map { String(cString: $0) }
+                let persons = decodeStringArray(personsStr)
+                let topicsStr = sqlite3_column_text(statement, 9).map { String(cString: $0) }
+                let topics = decodeStringArray(topicsStr)
+                let startOffset = Int(sqlite3_column_int(statement, 10))
+                let image = sqlite3_column_text(statement, 11).map { String(cString: $0) }
 
-                var guests: [String] = []
-                if let data = sqlite3_column_blob(statement, 6) {
-                    let length = sqlite3_column_bytes(statement, 6)
-                    let nsData = NSData(bytes: data, length: Int(length))
-                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
-                        guests = parsed
-                    }
-                }
-
-                var topics: [String] = []
-                if let data = sqlite3_column_blob(statement, 7) {
-                    let length = sqlite3_column_bytes(statement, 7)
-                    let nsData = NSData(bytes: data, length: Int(length))
-                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
-                        topics = parsed
-                    }
-                }
-
-                let startOffset = sqlite3_column_int(statement, 8) > 0 ? Int(sqlite3_column_int(statement, 8)) : nil
-
-                let item = NPOItem(
+                let segment = Segment(
                     id: id,
-                    broadcastId: broadcastId,
+                    providerId: providerId,
+                    parentId: parentId,
+                    parentType: parentType,
                     title: title,
                     description: description,
-                    type: type,
+                    startOffset: startOffset,
                     duration: duration,
-                    guests: guests,
+                    segmentType: segmentType,
+                    persons: persons,
                     topics: topics,
-                    startOffset: startOffset
+                    image: image
                 )
-                items.append(item)
+                segments.append(segment)
             }
         }
         sqlite3_finalize(statement)
-        return items
+        return segments
     }
 
     // MARK: - Playlist Operations
@@ -542,7 +662,7 @@ class DatabaseService {
         return false
     }
 
-    func addItemToPlaylist(playlistId: String, itemId: String, itemType: PlaylistItemType, broadcastId: String? = nil, programId: String? = nil) -> Bool {
+    func addItemToPlaylist(playlistId: String, itemId: String, itemType: PlaylistItemType, showId: String? = nil, providerId: String? = nil) -> Bool {
         // Get next position
         let maxPosQuery = "SELECT MAX(position) FROM playlist_items WHERE playlist_id = ?"
         var statement: OpaquePointer?
@@ -563,7 +683,7 @@ class DatabaseService {
         let addedAt = dateFormatter.string(from: Date())
 
         let query = """
-        INSERT INTO playlist_items (id, playlist_id, item_id, item_type, broadcast_id, program_id, position, added_at)
+        INSERT INTO playlist_items (id, playlist_id, item_id, item_type, show_id, provider_id, position, added_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
 
@@ -572,11 +692,11 @@ class DatabaseService {
             sqlite3_bind_text(statement, 2, playlistId, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(statement, 3, itemId, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(statement, 4, itemType.rawValue, -1, SQLITE_TRANSIENT)
-            if let broadcastId = broadcastId {
-                sqlite3_bind_text(statement, 5, broadcastId, -1, SQLITE_TRANSIENT)
+            if let showId = showId {
+                sqlite3_bind_text(statement, 5, showId, -1, SQLITE_TRANSIENT)
             }
-            if let programId = programId {
-                sqlite3_bind_text(statement, 6, programId, -1, SQLITE_TRANSIENT)
+            if let providerId = providerId {
+                sqlite3_bind_text(statement, 6, providerId, -1, SQLITE_TRANSIENT)
             }
             sqlite3_bind_int(statement, 7, Int32(nextPosition))
             sqlite3_bind_text(statement, 8, addedAt, -1, SQLITE_TRANSIENT)
@@ -596,7 +716,7 @@ class DatabaseService {
     func getPlaylistItems(_ playlistId: String) -> [PlaylistItem] {
         var items: [PlaylistItem] = []
         let query = """
-        SELECT id, playlist_id, item_id, item_type, broadcast_id, program_id, position, added_at
+        SELECT id, playlist_id, item_id, item_type, show_id, provider_id, position, added_at
         FROM playlist_items WHERE playlist_id = ? ORDER BY position ASC
         """
 
@@ -610,14 +730,14 @@ class DatabaseService {
                 let playlistId = String(cString: sqlite3_column_text(statement, 1))
                 let itemId = String(cString: sqlite3_column_text(statement, 2))
                 let itemTypeString = String(cString: sqlite3_column_text(statement, 3))
-                let itemType = PlaylistItemType(rawValue: itemTypeString) ?? .npoItem
-                let broadcastId = sqlite3_column_text(statement, 4).map { String(cString: $0) }
-                let programId = sqlite3_column_text(statement, 5).map { String(cString: $0) }
+                let itemType = PlaylistItemType(rawValue: itemTypeString) ?? .broadcast
+                let showId = sqlite3_column_text(statement, 4).map { String(cString: $0) }
+                let providerId = sqlite3_column_text(statement, 5).map { String(cString: $0) }
                 let position = Int(sqlite3_column_int(statement, 6))
                 let addedAtString = String(cString: sqlite3_column_text(statement, 7))
 
                 if let addedAt = dateFormatter.date(from: addedAtString) {
-                    let item = PlaylistItem(id: id, playlistId: playlistId, itemId: itemId, itemType: itemType, broadcastId: broadcastId, programId: programId, position: position, addedAt: addedAt)
+                    let item = PlaylistItem(id: id, playlistId: playlistId, itemId: itemId, itemType: itemType, contentType: nil, showId: showId, providerId: providerId, position: position, addedAt: addedAt)
                     items.append(item)
                 }
             }

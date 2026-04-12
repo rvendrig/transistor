@@ -95,18 +95,7 @@ struct Music: Codable {
     let duration: Int
 }
 
-struct PodcastFeed: Identifiable, Codable {
-    let id: String
-    let title: String
-    let description: String
-    let feedURL: String
-    let image: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, description, image
-        case feedURL = "feed_url"
-    }
-}
+// PodcastFeed is defined in PodcastFeedProvider.swift
 
 struct PodcastEpisode: Identifiable, Codable {
     let id: String
@@ -155,32 +144,5 @@ struct Playlist: Identifiable, Codable {
     }
 }
 
-struct PlaylistItem: Identifiable, Codable {
-    let id: String
-    let playlistId: String
-    let itemId: String
-    let itemType: PlaylistItemType
-    let broadcastId: String?
-    let programId: String?
-    let position: Int
-    let addedAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id, position
-        case playlistId = "playlist_id"
-        case itemId = "item_id"
-        case itemType = "item_type"
-        case broadcastId = "broadcast_id"
-        case programId = "program_id"
-        case addedAt = "added_at"
-    }
-}
-
-enum PlaylistItemType: String, Codable {
-    case npoItem = "npo_item"
-    case npoBroadcast = "npo_broadcast"
-    case npoProgram = "npo_program"
-}
-
-// Note: Generic Marker and Favorite models are now in GenericModels.swift
-// These replace the NPO-specific versions for provider-agnostic support
+// PlaylistItem and PlaylistItemType are defined in GenericModels.swift
+// Marker and Favorite models are also in GenericModels.swift

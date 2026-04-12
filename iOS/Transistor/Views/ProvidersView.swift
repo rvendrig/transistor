@@ -73,7 +73,7 @@ struct ProviderRow: View {
                     Text(provider.type.rawValue)
                         .font(.caption)
                         .foregroundColor(.gray)
-                        .textCase(.capitalized)
+                        .textCase(.uppercase)
                 }
 
                 Spacer()
@@ -103,7 +103,9 @@ struct ProviderDiscoveryView: View {
     var body: some View {
         List {
             Section("Available Networks") {
-                ForEach(availableProviders, id: \.0) { id, name, type in
+                ForEach(Array(availableProviders.enumerated()), id: \.offset) { _, provider in
+                    let (id, name, type) = provider
+                    let _ = id // suppress unused warning
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(name)
@@ -114,7 +116,7 @@ struct ProviderDiscoveryView: View {
                             Text(type.rawValue.replacingOccurrences(of: "_", with: " "))
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                                .textCase(.capitalized)
+                                .textCase(.uppercase)
                         }
 
                         Spacer()

@@ -21,11 +21,11 @@ struct BroadcastSchedule: Identifiable, Codable {
     }
 }
 
-// MARK: - Schedule Item (Program in a specific time slot)
+// MARK: - Schedule Item (Show in a specific time slot)
 struct ScheduleItem: Identifiable, Codable {
     let id: String
     let broadcastId: String?
-    let programId: String
+    let showId: String
     let title: String
     let description: String?
     let startTime: Date
@@ -37,7 +37,7 @@ struct ScheduleItem: Identifiable, Codable {
     enum CodingKeys: String, CodingKey {
         case id, title, description, presenters, image, duration
         case broadcastId = "broadcast_id"
-        case programId = "program_id"
+        case showId = "show_id"
         case startTime = "start_time"
         case endTime = "end_time"
     }

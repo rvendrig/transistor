@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CreatePlaylistView: View {
-    let viewModel: NPOViewModel
+    let viewModel: ContentViewModel
     @Binding var isPresented: Bool
 
     @State private var name = ""
@@ -64,6 +64,6 @@ struct CreatePlaylistView: View {
 
 #Preview {
     @State var isPresented = true
-    let viewModel = NPOViewModel()
+    let viewModel = ContentViewModel()
     return CreatePlaylistView(viewModel: viewModel, isPresented: $isPresented)
 }

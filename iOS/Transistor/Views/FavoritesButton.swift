@@ -1,18 +1,18 @@
 import SwiftUI
 
 struct FavoritesButton: View {
-    @ObservedObject var viewModel: NPOViewModel
-    let broadcastId: String
-    let itemType: String?
-    let programId: String?
+    @ObservedObject var viewModel: ContentViewModel
+    let contentId: String
+    let contentType: ContentType
+    let providerId: String
 
     var isFavorited: Bool {
-        viewModel.isBroadcastFavorited(broadcastId)
+        viewModel.isFavorited(contentId)
     }
 
     var body: some View {
         Button(action: {
-            viewModel.toggleFavorite(broadcastId: broadcastId, itemType: itemType, programId: programId)
+            viewModel.toggleFavorite(contentId: contentId, contentType: contentType, providerId: providerId)
         }) {
             Image(systemName: isFavorited ? "heart.fill" : "heart")
                 .foregroundColor(isFavorited ? .red : .gray)
@@ -21,6 +21,6 @@ struct FavoritesButton: View {
 }
 
 #Preview {
-    let viewModel = NPOViewModel()
-    FavoritesButton(viewModel: viewModel, broadcastId: "test-id", itemType: "broadcast", programId: nil)
+    let viewModel = ContentViewModel()
+    FavoritesButton(viewModel: viewModel, contentId: "test-id", contentType: .broadcast, providerId: "npo")
 }

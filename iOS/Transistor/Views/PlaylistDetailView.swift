@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PlaylistDetailView: View {
     let playlist: Playlist
-    let viewModel: NPOViewModel
+    let viewModel: ContentViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var showAddToPlaylist = false
@@ -81,8 +81,8 @@ struct PlaylistDetailView: View {
                                     .foregroundColor(.gray)
                             }
 
-                            if let broadcastId = item.broadcastId {
-                                Text("Broadcast: \(broadcastId)")
+                            if let showId = item.showId {
+                                Text("Show: \(showId)")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                     .lineLimit(1)
@@ -132,7 +132,7 @@ struct PlaylistDetailView: View {
 }
 
 #Preview {
-    let viewModel = NPOViewModel()
+    let viewModel = ContentViewModel()
     let playlist = Playlist(
         id: "1",
         name: "My Playlist",

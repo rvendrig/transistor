@@ -61,7 +61,7 @@ struct PlaybackView: View {
                                     .lineLimit(3)
 
                                 VStack(spacing: 4) {
-                                    Text(content.publishDate.formatted(date: .abbreviated, time: .short))
+                                    Text(content.publishDate.formatted(date: .abbreviated, time: .shortened))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
 
@@ -147,7 +147,7 @@ struct PlaybackView: View {
                             // Playback Speed
                             HStack(spacing: 12) {
                                 Text("Speed")
-                                    .font(.subheading)
+                                    .font(.subheadline)
                                     .foregroundColor(.secondary)
 
                                 Spacer()
@@ -234,7 +234,7 @@ struct ListeningSessionInfoCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Listening Session")
-                    .font(.subheading)
+                    .font(.subheadline)
                     .fontWeight(.semibold)
 
                 Spacer()

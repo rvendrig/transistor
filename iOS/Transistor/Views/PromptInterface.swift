@@ -9,7 +9,7 @@ struct PromptInterface: View {
 
     var suggestions: [String] {
         [
-            "Play NPO Radio 1",
+            "Play live radio",
             "Show me news from today",
             "Find interviews about technology",
             "Search music programs",

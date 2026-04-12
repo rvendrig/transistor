@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PlaylistsView: View {
-    @StateObject private var viewModel = NPOViewModel()
+    @StateObject private var viewModel = ContentViewModel()
     @State private var showCreatePlaylist = false
     @State private var editingPlaylist: Playlist?
     @State private var showEditPlaylist = false

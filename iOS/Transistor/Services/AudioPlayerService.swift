@@ -23,7 +23,7 @@ class AudioPlayerService: NSObject, ObservableObject {
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .default, options: [.deferredDeactivationDelay])
+            try audioSession.setCategory(.playback, mode: .default)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             errorMessage = "Failed to setup audio session: \(error.localizedDescription)"

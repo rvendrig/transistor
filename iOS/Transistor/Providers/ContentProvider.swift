@@ -1,19 +1,31 @@
 import Foundation
 
 // MARK: - Provider Protocol
+
 protocol ContentProvider {
     var id: String { get }
     var name: String { get }
     var type: ProviderType { get }
     var logo: String? { get }
 
+    func fetchNetworks() async throws -> [Network]
     func fetchChannels() async throws -> [Channel]
-    func fetchPrograms(forChannel channelId: String) async throws -> [Program]
-    func fetchBroadcasts(forProgram programId: String) async throws -> [Broadcast]
-    func search(_ query: String) async throws -> [AudioContent]
+    func fetchShows(forChannel channelId: String) async throws -> [Show]
+    func fetchSeasons(forShow showId: String) async throws -> [Season]
+    func fetchBroadcasts(forShow showId: String) async throws -> [Broadcast]
+    func fetchSegments(forBroadcast broadcastId: String) async throws -> [Segment]
+    func search(_ query: String) async throws -> [any AudioContent]
+}
+
+// Default implementations — not every provider has every level
+extension ContentProvider {
+    func fetchNetworks() async throws -> [Network] { [] }
+    func fetchSeasons(forShow showId: String) async throws -> [Season] { [] }
+    func fetchSegments(forBroadcast broadcastId: String) async throws -> [Segment] { [] }
 }
 
 // MARK: - Provider Types
+
 enum ProviderType: String, Codable {
     case radioNetwork = "radio_network"
     case podcastPlatform = "podcast_platform"
@@ -22,6 +34,7 @@ enum ProviderType: String, Codable {
 }
 
 // MARK: - Audio Content Protocol
+
 protocol AudioContent: Identifiable, Codable {
     var id: String { get }
     var providerId: String { get }
@@ -35,31 +48,24 @@ protocol AudioContent: Identifiable, Codable {
 }
 
 // MARK: - Content Types
-enum ContentType: String, Codable {
-    case broadcast = "broadcast"
-    case episode = "episode"
-    case stream = "stream"
-    case track = "track"
-}
 
-// MARK: - Search Results
-struct SearchResults: Codable {
-    let programs: [Program]
-    let broadcasts: [Broadcast]
-    let episodes: [Episode]
+enum ContentType: String, Codable {
+    case broadcast
+    case episode
+    case segment
+    case clip
+    case stream
 }
 
 // MARK: - Provider Store
+
 class ProviderStore: ObservableObject {
     static let shared = ProviderStore()
 
     @Published var providers: [String: ContentProvider] = [:]
     @Published var activeProviders: Set<String> = []
 
-    private init() {
-        // Register built-in providers
-        registerProvider(NPOProvider())
-    }
+    private init() {}
 
     func registerProvider(_ provider: ContentProvider) {
         providers[provider.id] = provider

@@ -1,22 +1,9 @@
 import SwiftUI
 
 struct SearchView: View {
-    @StateObject private var viewModel = NPOViewModel()
+    @StateObject private var viewModel = ContentViewModel()
     @State private var searchText = ""
-
-    var filteredPrograms: [NPOProgram] {
-        if searchText.isEmpty {
-            return viewModel.programs
-        } else {
-            return viewModel.programs.filter { program in
-                program.title.lowercased().contains(searchText.lowercased()) ||
-                    program.description.lowercased().contains(searchText.lowercased()) ||
-                    program.presenters.contains { presenter in
-                        presenter.lowercased().contains(searchText.lowercased())
-                    }
-            }
-        }
-    }
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         NavigationView {
@@ -25,12 +12,20 @@ struct SearchView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
-                        TextField("Search programs...", text: $searchText)
+                        TextField("Search shows, broadcasts...", text: $searchText)
                             .textFieldStyle(.roundedBorder)
+                            .onChange(of: searchText) { newValue in
+                                searchTask?.cancel()
+                                searchTask = Task {
+                                    try? await Task.sleep(nanoseconds: 300_000_000)
+                                    guard !Task.isCancelled else { return }
+                                    await viewModel.search(newValue)
+                                }
+                            }
                     }
                 }
 
-                if viewModel.isLoading {
+                if viewModel.isSearching {
                     HStack {
                         ProgressView()
                             .tint(.transistorGreen)
@@ -39,39 +34,101 @@ struct SearchView: View {
                     }
                 }
 
-                if !filteredPrograms.isEmpty {
-                    Section("Results (\(filteredPrograms.count))") {
-                        ForEach(filteredPrograms) { program in
-                            NavigationLink(destination: NPOProgramsViewV2(channel: NPOChannel(id: program.channelId ?? "", name: "", description: "", logoURL: nil), onBack: {})) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(program.title)
-                                        .font(.headline)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
+                let results = viewModel.searchResults
 
-                                    Text(program.description)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                        .lineLimit(2)
+                if !results.shows.isEmpty {
+                    Section("Shows (\(results.shows.count))") {
+                        ForEach(results.shows) { show in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(show.currentTitle)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
 
-                                    if !program.presenters.isEmpty {
-                                        Text("With: \(program.presenters.joined(separator: ", "))")
-                                            .font(.caption2)
-                                            .foregroundColor(.transistorGreen)
-                                    }
+                                Text(show.description)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .lineLimit(2)
+
+                                if !show.presenters.isEmpty {
+                                    Text("With: \(show.presenters.joined(separator: ", "))")
+                                        .font(.caption2)
+                                        .foregroundColor(.transistorGreen)
                                 }
-                                .padding(.vertical, 8)
                             }
+                            .padding(.vertical, 8)
                         }
                     }
-                } else if !searchText.isEmpty {
+                }
+
+                if !results.broadcasts.isEmpty {
+                    Section("Broadcasts (\(results.broadcasts.count))") {
+                        ForEach(results.broadcasts) { broadcast in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(broadcast.displayTitle)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+
+                                HStack(spacing: 12) {
+                                    Label(
+                                        broadcast.startTime.formatted(date: .abbreviated, time: .shortened),
+                                        systemImage: "calendar"
+                                    )
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+
+                                    Label(
+                                        "\(broadcast.duration / 60) min",
+                                        systemImage: "clock"
+                                    )
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
+                    }
+                }
+
+                if !results.episodes.isEmpty {
+                    Section("Episodes (\(results.episodes.count))") {
+                        ForEach(results.episodes) { episode in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(episode.displayTitle)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+
+                                HStack(spacing: 12) {
+                                    Label(
+                                        episode.publishDate.formatted(date: .abbreviated, time: .shortened),
+                                        systemImage: "calendar"
+                                    )
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+
+                                    Label(
+                                        "\(episode.duration / 60) min",
+                                        systemImage: "clock"
+                                    )
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
+                    }
+                }
+
+                if !searchText.isEmpty && results.totalResults == 0 && !viewModel.isSearching {
                     VStack(alignment: .center, spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 40))
                             .foregroundColor(.gray)
                         Text("No results found")
                             .foregroundColor(.gray)
-                        Text("Try searching for another program, presenter, or topic")
+                        Text("Try searching for another show, broadcast, or topic")
                             .font(.caption)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -81,13 +138,8 @@ struct SearchView: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("🔍 Search")
+            .navigationTitle("Search")
             .background(Color.darkBg)
-            .onAppear {
-                Task {
-                    await viewModel.loadAllPrograms()
-                }
-            }
         }
     }
 }

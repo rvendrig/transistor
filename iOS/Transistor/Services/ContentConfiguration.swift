@@ -20,31 +20,33 @@ class ContentConfig {
 
     static func enableRealContent() {
         Self.mode = .realContent
-        print("✅ Real content enabled")
+        print("Real content enabled")
     }
 
     static func enableMockData() {
         Self.mode = .mockData
-        print("📋 Mock data enabled")
+        print("Mock data enabled")
     }
 
     static func enableHybridMode() {
         Self.mode = .hybrid
-        print("🔄 Hybrid mode enabled (real with fallback)")
+        print("Hybrid mode enabled (real with fallback)")
     }
 
     // MARK: - Debug Info
 
     static func printConfiguration() {
+        let channelNames = getAvailableChannels()
+        let podcastNames = podcastsAvailable()
         print("""
-        ═══════════════════════════════════
-        📡 TRANSISTOR CONTENT CONFIGURATION
-        ═══════════════════════════════════
+        ===================================
+        TRANSISTOR CONTENT CONFIGURATION
+        ===================================
         Mode: \(Self.mode)
-        Channels: \(Self.getAvailableChannels().count)
-        Audio URLs: \(Self.audioURLsAvailable() ? "✅ Real" : "ℹ️ Mock")
-        Podcasts: \(Self.podcastsAvailable().count) feeds
-        ═══════════════════════════════════
+        Channels: \(channelNames.count)
+        Audio URLs: \(audioURLsAvailable() ? "Real" : "Mock")
+        Podcasts: \(podcastNames.count) feeds
+        ===================================
         """)
     }
 
@@ -59,28 +61,25 @@ class ContentConfig {
         }
     }
 
+    /// Returns available channel names from registered providers.
+    /// No longer hardcoded to NPO -- pulls from ProviderStore if providers are registered,
+    /// otherwise falls back to a sensible default.
     static func getAvailableChannels() -> [String] {
-        return [
-            "NPO Radio 1",
-            "NPO Radio 2",
-            "NPO 3FM",
-            "NPO Radio 4",
-            "NPO Radio 5",
-            "NPO Radio 6"
-        ]
+        let store = ProviderStore.shared
+        let providers = store.allActiveProviders()
+
+        if providers.isEmpty {
+            // Fallback when ProviderStore hasn't been populated yet
+            return []
+        }
+
+        // Collect channel names synchronously from known local sources
+        // Full async channel fetch is done through ContentViewModel
+        return providers.map { $0.name }
     }
 
     static func podcastsAvailable() -> [String] {
-        return [
-            "VPRO Dokzine",
-            "NTR Humaan",
-            "BnnVara Rapscribe",
-            "BBC Radio 4 Today",
-            "NPR News Now",
-            "BBC Tech News",
-            "Crash Course",
-            "Ologies"
-        ]
+        return ContentEnrichmentService.shared.getPopularPodcasts().map { $0.title }
     }
 }
 
@@ -92,34 +91,33 @@ class RealContentSeed {
 
     /// Get seed data for NPO channels with real streams
     func getNPOChannelsWithRealStreams() -> [(channelId: String, name: String, description: String, audioUrl: String)] {
-        return [
-            ("radio1", "NPO Radio 1", "Nieuws, sport, cultuur en entertainment", "https://www.nporadio.nl/live/npo-radio-1/index.m3u8"),
-            ("radio2", "NPO Radio 2", "Muziek, entertainment en informatieve programma's", "https://www.nporadio.nl/live/npo-radio-2/index.m3u8"),
-            ("3fm", "NPO 3FM", "Muziek, hits en alternatieve nummers", "https://www.nporadio.nl/live/npo-3fm/index.m3u8"),
-            ("radio4", "NPO Radio 4", "Klassieke muziek en jazz", "https://www.nporadio.nl/live/npo-radio-4/index.m3u8"),
-            ("radio5", "NPO Radio 5", "Documentaires en reportages", "https://www.nporadio.nl/live/npo-radio-5/index.m3u8"),
-            ("radio6", "NPO Radio 6", "Muziek en verhalen", "https://www.nporadio.nl/live/npo-radio-6/index.m3u8")
-        ]
+        let provider = NPOProvider()
+        return provider.getRealContent().enumerated().map { index, pair in
+            let channelIds = ["radio1", "radio2", "3fm", "radio4", "radio5", "radio6"]
+            let descriptions = [
+                "Nieuws, sport, cultuur en entertainment",
+                "Muziek, entertainment en informatieve programma's",
+                "Muziek, hits en alternatieve nummers",
+                "Klassieke muziek en jazz",
+                "Documentaires en reportages",
+                "Muziek en verhalen"
+            ]
+            let channelId = index < channelIds.count ? channelIds[index] : "radio\(index + 1)"
+            let description = index < descriptions.count ? descriptions[index] : pair.channel
+            return (channelId: channelId, name: pair.channel, description: description, audioUrl: pair.url)
+        }
     }
 
     /// Get real podcast feeds for seeding
     func getRealPodcasts() -> [(title: String, feedURL: String, description: String)] {
-        return [
-            ("BBC Radio 4 Today", "https://podcasts.bbc.co.uk/today/rss.xml", "Leading current affairs from BBC Radio 4"),
-            ("NPR News Now", "https://feeds.npr.org/500005/podcast.xml", "Up-to-the-minute news from NPR"),
-            ("Ologies", "https://feeds.acast.com/public/shows/ologies", "Educational podcast about sciences"),
-            ("VPRO Dokzine", "https://feeds.acast.com/public/shows/dokzine", "Journalistiek podcast van VPRO"),
-            ("Crash Course", "https://feeds.acast.com/public/shows/crash-course-side-hustle", "Educational videos on various topics")
-        ]
+        return ContentEnrichmentService.shared.getPopularPodcasts().prefix(5).map { feed in
+            (title: feed.title, feedURL: feed.feedURL, description: feed.description ?? "")
+        }
     }
 
     /// Test URLs that definitely work
     func getTestAudioURLs() -> [String: String] {
-        return [
-            "npo_radio1": "https://www.nporadio.nl/live/npo-radio-1/index.m3u8",
-            "bbc_radio4": "https://a.files.bbci.co.uk/media/live/manifesto/audio_128kbps/coreuswest/bbc_radio_four_fm.m3u8",
-            "sample": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        ]
+        return ContentEnrichmentService.shared.getTestAudioURLs()
     }
 }
 
@@ -128,7 +126,7 @@ class RealContentSeed {
 /// Print helpful debugging information
 func debugContentSetup() {
     print("""
-    🔧 TRANSISTOR CONTENT SETUP DEBUG
+    TRANSISTOR CONTENT SETUP DEBUG
 
     Configuration: \(ContentConfig.mode)
 

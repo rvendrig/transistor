@@ -105,7 +105,7 @@ struct AudioPlayerView: View {
                         .font(.headline)
                         .lineLimit(2)
 
-                    Text(content.publishDate.formatted(date: .abbreviated, time: .short))
+                    Text(content.publishDate.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

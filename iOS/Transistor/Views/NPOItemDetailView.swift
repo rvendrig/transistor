@@ -3,7 +3,7 @@ import SwiftUI
 struct NPOItemDetailView: View {
     let item: NPOItem
     let broadcast: NPOBroadcast
-    @StateObject private var viewModel = NPOViewModel()
+    @StateObject private var contentViewModel = ContentViewModel()
     @State private var showAddToPlaylist = false
 
     var body: some View {
@@ -96,14 +96,16 @@ struct NPOItemDetailView: View {
                             .font(.headline)
                             .foregroundColor(.white)
 
-                        Wrap(items: item.topics, id: \.self) { topic in
-                            Text(topic)
-                                .font(.caption)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.transistorGreen.opacity(0.3))
-                                .cornerRadius(16)
+                        FlowLayout(spacing: 8) {
+                            ForEach(item.topics, id: \.self) { topic in
+                                Text(topic)
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.transistorGreen.opacity(0.3))
+                                    .cornerRadius(16)
+                            }
                         }
                     }
                     .padding()
@@ -128,10 +130,10 @@ struct NPOItemDetailView: View {
             }
         }
         .sheet(isPresented: $showAddToPlaylist) {
-            AddToPlaylistView(viewModel: viewModel, playlistId: item.id, isPresented: $showAddToPlaylist)
+            AddToPlaylistView(viewModel: contentViewModel, playlistId: item.id, isPresented: $showAddToPlaylist)
         }
         .onAppear {
-            viewModel.loadPlaylists()
+            contentViewModel.loadPlaylists()
         }
     }
 
@@ -158,36 +160,45 @@ struct NPOItemDetailView: View {
     }
 }
 
-// Helper view for wrapping items in a grid
-struct Wrap<Content: View, Item: Identifiable>: View {
-    let items: [Item]
-    let id: KeyPath<Item, Item.ID>
-    let content: (Item) -> Content
+// Simple flow layout for tags
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            var currentRow: [Item] = []
-            var rows: [[Item]] = []
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
 
-            for item in items {
-                currentRow.append(item)
-                if currentRow.count >= 2 {
-                    rows.append(currentRow)
-                    currentRow = []
-                }
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
             }
-            if !currentRow.isEmpty {
-                rows.append(currentRow)
-            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
 
-            ForEach(rows, id: \.hashValue) { row in
-                HStack(spacing: 8) {
-                    ForEach(row) { item in
-                        content(item)
-                        Spacer()
-                    }
-                }
+        return CGSize(width: maxWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX && x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
             }
+            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
         }
     }
 }
@@ -213,7 +224,8 @@ struct Wrap<Content: View, Item: Identifiable>: View {
                 startTime: Date(),
                 duration: 3600,
                 description: "The best of the morning",
-                image: nil
+                image: nil,
+                audioUrl: nil
             )
         )
     }

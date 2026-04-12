@@ -5,7 +5,7 @@ class PodcastFeedProvider: ContentProvider {
     let id = "podcast_feed"
     let name = "Podcast Feeds"
     let type = ProviderType.podcastPlatform
-    let logo = nil
+    let logo: String? = nil
 
     private var feeds: [PodcastFeed] = []
 
@@ -30,26 +30,27 @@ class PodcastFeedProvider: ContentProvider {
             Channel(
                 id: feed.id,
                 providerId: id,
-                name: feed.title,
+                networkId: "podcast_feed",
+                titles: [TitledPeriod(title: feed.title)],
                 description: feed.description,
                 logo: feed.image
             )
         }
     }
 
-    func fetchPrograms(forChannel channelId: String) async throws -> [Program] {
+    func fetchShows(forChannel channelId: String) async throws -> [Show] {
         // For podcast feeds, each feed is a "channel" and contains episodes
-        // This returns an empty array since podcasts don't have programs/series
+        // This returns an empty array since podcasts don't have shows/series
         return []
     }
 
-    func fetchBroadcasts(forProgram programId: String) async throws -> [Broadcast] {
+    func fetchBroadcasts(forShow showId: String) async throws -> [Broadcast] {
         // Not applicable for podcast feeds
         return []
     }
 
-    func search(_ query: String) async throws -> [AudioContent] {
-        var results: [AudioContent] = []
+    func search(_ query: String) async throws -> [any AudioContent] {
+        var results: [any AudioContent] = []
 
         for feed in feeds {
             // Search in feed metadata
@@ -167,13 +168,15 @@ class RSSFeedParser: NSObject, XMLParserDelegate {
                 id: UUID().uuidString,
                 providerId: "podcast_feed",
                 title: currentTitle,
-                feedId: nil,
+                showId: nil,
+                seasonId: nil,
                 feedTitle: feedTitle,
                 publishDate: pubDate,
                 duration: 0, // Would need to be parsed from media:duration or similar
                 audioUrl: currentAudioURL.isEmpty ? nil : currentAudioURL,
                 description: currentDescription.isEmpty ? nil : currentDescription,
-                image: feedImage.isEmpty ? nil : feedImage
+                image: feedImage.isEmpty ? nil : feedImage,
+                titleOverride: nil
             )
 
             episodes.append(episode)

@@ -1,112 +1,262 @@
 import Foundation
 
-// MARK: - Generic Channel
-struct Channel: Identifiable, Codable {
+// MARK: - Titled Period (tijdgebonden naamgeving)
+
+struct TitledPeriod: Codable {
+    let title: String
+    let from: Date?         // nil = altijd geldig geweest
+    let until: Date?        // nil = nog steeds geldig (= huidige naam)
+    let isOfficial: Bool    // true = officiële naam, false = bijnaam/variant
+
+    init(title: String, from: Date? = nil, until: Date? = nil, isOfficial: Bool = true) {
+        self.title = title
+        self.from = from
+        self.until = until
+        self.isOfficial = isOfficial
+    }
+}
+
+// MARK: - Titled Protocol
+
+protocol Titled {
+    var titles: [TitledPeriod] { get }
+    var currentTitle: String { get }
+}
+
+extension Titled {
+    var currentTitle: String {
+        titles.first(where: { $0.until == nil })?.title
+            ?? titles.last?.title ?? ""
+    }
+
+    func title(at date: Date) -> String {
+        titles.first(where: {
+            ($0.from ?? .distantPast) <= date && date <= ($0.until ?? .distantFuture)
+        })?.title ?? currentTitle
+    }
+}
+
+// MARK: - Network (boeket: NPO, BBC, ...)
+
+struct Network: Identifiable, Codable, Titled {
     let id: String
     let providerId: String
-    let name: String
+    let titles: [TitledPeriod]
     let description: String
     let logo: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, description
-        case providerId = "provider_id"
-        case logo = "logo_url"
-    }
-
-    /// Unique key combining provider and channel ID
-    var uniqueKey: String {
-        "\(providerId):\(id)"
+    var currentTitle: String {
+        titles.first(where: { $0.until == nil })?.title
+            ?? titles.last?.title ?? ""
     }
 }
 
-// MARK: - Generic Program (Series)
-struct Program: Identifiable, Codable {
+// MARK: - Channel (zender/station binnen een network)
+
+struct Channel: Identifiable, Codable, Titled {
     let id: String
     let providerId: String
-    let title: String
+    let networkId: String
+    let titles: [TitledPeriod]
+    let description: String
+    let logo: String?
+
+    var currentTitle: String {
+        titles.first(where: { $0.until == nil })?.title
+            ?? titles.last?.title ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, description, logo, titles
+        case providerId = "provider_id"
+        case networkId = "network_id"
+    }
+}
+
+// MARK: - Show (programma/podcast — onafhankelijk van channel)
+
+struct Show: Identifiable, Codable, Titled {
+    let id: String
+    let providerId: String
+    let titles: [TitledPeriod]
     let description: String
     let presenters: [String]
     let genre: String?
-    let channelId: String?
+    let channelIds: [String]?
     let image: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id, title, description, presenters, genre, image
-        case providerId = "provider_id"
-        case channelId = "channel_id"
+    var currentTitle: String {
+        titles.first(where: { $0.until == nil })?.title
+            ?? titles.last?.title ?? ""
     }
 
-    var uniqueKey: String {
-        "\(providerId):\(id)"
+    enum CodingKeys: String, CodingKey {
+        case id, description, presenters, genre, image, titles
+        case providerId = "provider_id"
+        case channelIds = "channel_ids"
     }
 }
 
-// MARK: - Generic Broadcast (Radio/TV episode)
+// MARK: - Season (seizoen binnen een show)
+
+struct Season: Identifiable, Codable, Titled {
+    let id: String
+    let providerId: String
+    let showId: String
+    let titles: [TitledPeriod]
+    let seasonNumber: Int?
+    let description: String?
+
+    var currentTitle: String {
+        titles.first(where: { $0.until == nil })?.title
+            ?? titles.last?.title ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, titles, description
+        case providerId = "provider_id"
+        case showId = "show_id"
+        case seasonNumber = "season_number"
+    }
+}
+
+// MARK: - Broadcast (uitzending = show + channel + tijdstip)
+
 struct Broadcast: Identifiable, Codable, AudioContent {
     let id: String
     let providerId: String
     let title: String
-    let programId: String?
+    let showId: String?
+    let channelId: String?
+    let seasonId: String?
     let startTime: Date
-    let duration: Int // in seconds
+    let duration: Int
     let description: String?
     let image: String?
     let audioUrl: String?
+    let titleOverride: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id, title, description, image, duration
-        case providerId = "provider_id"
-        case programId = "program_id"
-        case startTime = "start_time"
-        case audioUrl = "audio_url"
+    var displayTitle: String {
+        titleOverride ?? title
     }
 
     // AudioContent conformance
     var publishDate: Date { startTime }
     var contentType: ContentType { .broadcast }
 
-    var uniqueKey: String {
-        "\(providerId):\(id)"
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, image, duration
+        case providerId = "provider_id"
+        case showId = "show_id"
+        case channelId = "channel_id"
+        case seasonId = "season_id"
+        case startTime = "start_time"
+        case audioUrl = "audio_url"
+        case titleOverride = "title_override"
     }
 }
 
-// MARK: - Generic Episode (Podcast)
+// MARK: - Episode (aflevering = show + publicatiedatum, podcast)
+
 struct Episode: Identifiable, Codable, AudioContent {
     let id: String
     let providerId: String
     let title: String
-    let feedId: String?
+    let showId: String?
+    let seasonId: String?
     let feedTitle: String?
     let publishDate: Date
-    let duration: Int // in seconds
+    let duration: Int
     let audioUrl: String?
     let description: String?
     let image: String?
+    let titleOverride: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id, title, description, image, duration, feedTitle
-        case providerId = "provider_id"
-        case feedId = "feed_id"
-        case publishDate = "publish_date"
-        case audioUrl = "audio_url"
+    var displayTitle: String {
+        titleOverride ?? title
     }
 
     // AudioContent conformance
     var contentType: ContentType { .episode }
 
-    var uniqueKey: String {
-        "\(providerId):\(id)"
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, image, duration, feedTitle
+        case providerId = "provider_id"
+        case showId = "show_id"
+        case seasonId = "season_id"
+        case publishDate = "publish_date"
+        case audioUrl = "audio_url"
+        case titleOverride = "title_override"
     }
 }
 
-// MARK: - Generic Marker
+// MARK: - Segment (structureel format-onderdeel: interview, nieuwsblok, muziek)
+
+struct Segment: Identifiable, Codable {
+    let id: String
+    let providerId: String
+    let parentId: String
+    let parentType: ContentType
+    let title: String
+    let description: String?
+    let startOffset: Int
+    let duration: Int
+    let segmentType: SegmentType
+    let persons: [String]
+    let topics: [String]
+    let image: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, duration, persons, topics, image
+        case providerId = "provider_id"
+        case parentId = "parent_id"
+        case parentType = "parent_type"
+        case startOffset = "start_offset"
+        case segmentType = "segment_type"
+    }
+}
+
+enum SegmentType: String, Codable {
+    case interview
+    case music
+    case news
+    case report
+    case chapter
+    case discussion
+    case other
+}
+
+// MARK: - Clip (willekeurig gekozen fragment, onafhankelijk adresseerbaar)
+
+struct Clip: Identifiable, Codable {
+    let id: String
+    let providerId: String
+    let sourceId: String
+    let sourceType: ContentType
+    let title: String
+    let description: String?
+    let startOffset: Int
+    let duration: Int
+    let audioUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, duration
+        case providerId = "provider_id"
+        case sourceId = "source_id"
+        case sourceType = "source_type"
+        case startOffset = "start_offset"
+        case audioUrl = "audio_url"
+    }
+}
+
+// MARK: - Marker (gebruiker-geplaatst tijdstip)
+
 struct Marker: Identifiable, Codable {
     let id: String
     let contentId: String
     let contentType: ContentType
     let providerId: String
-    let timestamp: Int // offset from start in seconds
+    let timestamp: Int
     let tags: [String]
     let createdAt: Date
 
@@ -117,13 +267,10 @@ struct Marker: Identifiable, Codable {
         case providerId = "provider_id"
         case createdAt = "created_at"
     }
-
-    var uniqueKey: String {
-        "\(providerId):\(contentId):\(timestamp)"
-    }
 }
 
-// MARK: - Generic Favorite
+// MARK: - Favorite
+
 struct Favorite: Identifiable, Codable {
     let id: String
     let contentId: String
@@ -138,21 +285,17 @@ struct Favorite: Identifiable, Codable {
         case providerId = "provider_id"
         case addedAt = "added_at"
     }
-
-    var uniqueKey: String {
-        "\(providerId):\(contentId)"
-    }
 }
 
-// MARK: - Update Playlist Models for Provider Support
+// MARK: - Playlist Item
+
 struct PlaylistItem: Identifiable, Codable {
     let id: String
     let playlistId: String
     let itemId: String
     let itemType: PlaylistItemType
     let contentType: ContentType?
-    let broadcastId: String?
-    let programId: String?
+    let showId: String?
     let providerId: String?
     let position: Int
     let addedAt: Date
@@ -163,22 +306,22 @@ struct PlaylistItem: Identifiable, Codable {
         case itemId = "item_id"
         case itemType = "item_type"
         case contentType = "content_type"
-        case broadcastId = "broadcast_id"
-        case programId = "program_id"
+        case showId = "show_id"
         case providerId = "provider_id"
         case addedAt = "added_at"
     }
 }
 
 enum PlaylistItemType: String, Codable {
-    case npoItem = "npo_item"
-    case npoBroadcast = "npo_broadcast"
-    case npoProgram = "npo_program"
-    case episode = "episode"
-    case podcast = "podcast"
+    case show
+    case broadcast
+    case episode
+    case segment
+    case clip
 }
 
-// MARK: - Listening Session (for logging and history)
+// MARK: - Listening Session
+
 struct ListeningSession: Identifiable, Codable {
     let id: String
     let contentId: String
@@ -188,8 +331,8 @@ struct ListeningSession: Identifiable, Codable {
     let source: String
     let startTime: Date
     var endTime: Date?
-    let duration: Int // total duration in seconds
-    var progress: Int // in seconds
+    let duration: Int
+    var progress: Int
     let categories: [ContentCategory]
     let topics: [String]
     let guests: [String]
@@ -209,7 +352,6 @@ struct ListeningSession: Identifiable, Codable {
         case markerCount = "marker_count"
     }
 
-    // Computed properties
     var percentage: Int {
         guard duration > 0 else { return 0 }
         return Int((Double(progress) / Double(duration)) * 100)
@@ -233,18 +375,11 @@ struct ListeningSession: Identifiable, Codable {
     }
 }
 
-// MARK: - Content Category for Listening History
+// MARK: - Content Category
+
 enum ContentCategory: String, Codable, CaseIterable {
-    case news
-    case music
-    case interview
-    case sports
-    case education
-    case entertainment
-    case podcast
-    case documentary
-    case comedy
-    case other
+    case news, music, interview, sports, education
+    case entertainment, podcast, documentary, comedy, other
 
     var displayName: String {
         switch self {
@@ -263,12 +398,13 @@ enum ContentCategory: String, Codable, CaseIterable {
 }
 
 // MARK: - Unified Search Result
+
 struct UnifiedSearchResult: Codable {
-    let programs: [Program]
+    let shows: [Show]
     let broadcasts: [Broadcast]
     let episodes: [Episode]
 
     var totalResults: Int {
-        programs.count + broadcasts.count + episodes.count
+        shows.count + broadcasts.count + episodes.count
     }
 }

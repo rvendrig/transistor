@@ -3,7 +3,6 @@ import SwiftUI
 struct ScheduleView: View {
     @StateObject private var viewModel = ContentViewModel()
     @State private var selectedDate = Date()
-    @State private var selectedProvider = "npo"
 
     var body: some View {
         NavigationView {

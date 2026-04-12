@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct MarkerListView: View {
-    @ObservedObject var viewModel: NPOViewModel
-    let broadcastId: String
+    @ObservedObject var viewModel: ContentViewModel
+    let contentId: String
 
     var body: some View {
         if viewModel.markers.isEmpty {
@@ -39,14 +39,16 @@ struct MarkerListView: View {
                             }
 
                             if !marker.tags.isEmpty {
-                                Wrap(items: marker.tags, id: \.self) { tag in
-                                    Text(tag)
-                                        .font(.caption2)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.transistorGreen.opacity(0.3))
-                                        .cornerRadius(12)
+                                HStack(spacing: 4) {
+                                    ForEach(marker.tags, id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption2)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.transistorGreen.opacity(0.3))
+                                            .cornerRadius(12)
+                                    }
                                 }
                             }
                         }
@@ -73,41 +75,8 @@ struct MarkerListView: View {
     }
 }
 
-// Helper view for wrapping items in a grid
-struct Wrap<Content: View, Item: Identifiable>: View {
-    let items: [Item]
-    let id: KeyPath<Item, Item.ID>
-    let content: (Item) -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            var currentRow: [Item] = []
-            var rows: [[Item]] = []
-
-            for item in items {
-                currentRow.append(item)
-                if currentRow.count >= 2 {
-                    rows.append(currentRow)
-                    currentRow = []
-                }
-            }
-            if !currentRow.isEmpty {
-                rows.append(currentRow)
-            }
-
-            ForEach(rows, id: \.hashValue) { row in
-                HStack(spacing: 8) {
-                    ForEach(row) { item in
-                        content(item)
-                        Spacer()
-                    }
-                }
-            }
-        }
-    }
-}
 
 #Preview {
-    let viewModel = NPOViewModel()
-    MarkerListView(viewModel: viewModel, broadcastId: "test-id")
+    let viewModel = ContentViewModel()
+    MarkerListView(viewModel: viewModel, contentId: "test-id")
 }

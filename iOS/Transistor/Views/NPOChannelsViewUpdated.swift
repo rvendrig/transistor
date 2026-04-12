@@ -152,6 +152,7 @@ struct NPOBroadcastsViewV2: View {
     let onBack: () -> Void
 
     @StateObject private var viewModel = NPOViewModel()
+    @StateObject private var contentViewModel = ContentViewModel()
     @State private var selectedBroadcast: NPOBroadcast?
     @State private var showAddBroadcastToPlaylist = false
     @State private var showAddProgramToPlaylist = false
@@ -230,17 +231,17 @@ struct NPOBroadcastsViewV2: View {
         .background(Color.darkBg)
         .sheet(isPresented: $showAddBroadcastToPlaylist) {
             if let broadcast = selectedBroadcastForPlaylist {
-                AddToPlaylistView(viewModel: viewModel, playlistId: broadcast.id, isPresented: $showAddBroadcastToPlaylist)
+                AddToPlaylistView(viewModel: contentViewModel, playlistId: broadcast.id, isPresented: $showAddBroadcastToPlaylist)
             }
         }
         .sheet(isPresented: $showAddProgramToPlaylist) {
-            AddToPlaylistView(viewModel: viewModel, playlistId: program.id, isPresented: $showAddProgramToPlaylist)
+            AddToPlaylistView(viewModel: contentViewModel, playlistId: program.id, isPresented: $showAddProgramToPlaylist)
         }
         .onAppear {
             Task {
                 await viewModel.loadBroadcasts(forProgram: program.id)
             }
-            viewModel.loadPlaylists()
+            contentViewModel.loadPlaylists()
         }
     }
 }
@@ -248,7 +249,7 @@ struct NPOBroadcastsViewV2: View {
 struct NPOItemsViewV2: View {
     let broadcast: NPOBroadcast
     @State private var items: [NPOItem] = []
-    @StateObject private var viewModel = NPOViewModel()
+    @StateObject private var contentViewModel = ContentViewModel()
     @State private var showAddToPlaylist = false
     @State private var selectedItemForPlaylist: NPOItem?
 
@@ -305,12 +306,12 @@ struct NPOItemsViewV2: View {
         .background(Color.darkBg)
         .sheet(isPresented: $showAddToPlaylist) {
             if let selectedItem = selectedItemForPlaylist {
-                AddToPlaylistView(viewModel: viewModel, playlistId: selectedItem.id, isPresented: $showAddToPlaylist)
+                AddToPlaylistView(viewModel: contentViewModel, playlistId: selectedItem.id, isPresented: $showAddToPlaylist)
             }
         }
         .onAppear {
             items = NPODataService.shared.getItemsForBroadcast(broadcast.id)
-            viewModel.loadPlaylists()
+            contentViewModel.loadPlaylists()
         }
     }
 
