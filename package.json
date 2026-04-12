@@ -29,7 +29,8 @@
     "expo-sqlite": "^13.1.0",
     "xml2js": "^0.6.2",
     "zustand": "^4.4.0",
-    "date-fns": "^2.30.0"
+    "date-fns": "^2.30.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@testing-library/react-native": "^12.2.0",
