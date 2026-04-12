@@ -17,6 +17,17 @@ class NPOViewModel: ObservableObject {
     @Published var isLoadingPlaylists = false
     @Published var playlistError: String?
 
+    // Marker properties
+    @Published var markers: [NPOMarker] = []
+    @Published var isLoadingMarkers = false
+    @Published var markerError: String?
+
+    // Favorite properties
+    @Published var favorites: [NPOFavorite] = []
+    @Published var isFavoritedBroadcasts: Set<String> = []
+    @Published var isLoadingFavorites = false
+    @Published var favoriteError: String?
+
     private let apiService = NPOAPIService.shared
     private let mockDataService = NPODataService.shared
     private let dbService = DatabaseService.shared
@@ -262,5 +273,87 @@ class NPOViewModel: ObservableObject {
             playlistError = "Failed to remove item from playlist"
             print("Error: Could not remove item from playlist")
         }
+    }
+
+    // MARK: - Markers
+
+    func loadMarkers(forBroadcast broadcastId: String) {
+        isLoadingMarkers = true
+        markerError = nil
+
+        markers = dbService.getMarkersByBroadcast(broadcastId)
+        isLoadingMarkers = false
+    }
+
+    func createMarker(broadcastId: String, timestamp: Int, tags: [String]) {
+        markerError = nil
+
+        guard !tags.isEmpty else {
+            markerError = "Please add at least one tag to the marker"
+            return
+        }
+
+        if let marker = dbService.createMarker(broadcastId: broadcastId, timestamp: timestamp, tags: tags) {
+            markers.append(marker)
+        } else {
+            markerError = "Failed to create marker"
+            print("Error: Could not create marker in database")
+        }
+    }
+
+    func deleteMarker(_ markerId: String) {
+        markerError = nil
+
+        if dbService.deleteMarker(markerId) {
+            markers.removeAll { $0.id == markerId }
+        } else {
+            markerError = "Failed to delete marker"
+            print("Error: Could not delete marker from database")
+        }
+    }
+
+    // MARK: - Favorites
+
+    func loadFavorites() {
+        isLoadingFavorites = true
+        favoriteError = nil
+
+        do {
+            favorites = dbService.getAllFavorites()
+            isFavoritedBroadcasts = Set(favorites.map { $0.broadcastId })
+            isLoadingFavorites = false
+        } catch {
+            favoriteError = "Failed to load favorites"
+            isLoadingFavorites = false
+            print("Error loading favorites: \(error.localizedDescription)")
+        }
+    }
+
+    func toggleFavorite(broadcastId: String, itemType: String? = nil, programId: String? = nil) {
+        favoriteError = nil
+
+        if isFavoritedBroadcasts.contains(broadcastId) {
+            // Remove from favorites
+            if dbService.removeFavorite(broadcastId) {
+                isFavoritedBroadcasts.remove(broadcastId)
+                favorites.removeAll { $0.broadcastId == broadcastId }
+            } else {
+                favoriteError = "Failed to remove from favorites"
+                print("Error: Could not remove favorite from database")
+            }
+        } else {
+            // Add to favorites
+            if let favorite = dbService.addFavorite(broadcastId: broadcastId, itemType: itemType, programId: programId) {
+                isFavoritedBroadcasts.insert(broadcastId)
+                favorites.append(favorite)
+            } else {
+                favoriteError = "Failed to add to favorites"
+                print("Error: Could not add favorite to database")
+            }
+        }
+    }
+
+    func isBroadcastFavorited(_ broadcastId: String) -> Bool {
+        return isFavoritedBroadcasts.contains(broadcastId)
     }
 }
