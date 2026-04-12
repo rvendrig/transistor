@@ -59,21 +59,32 @@ npm run web
 
 ```
 src/
-├── app/                      # Expo Router app structure
-│   ├── (tabs)/              # Main tabbed navigation
-│   │   ├── index.tsx        # Discover/Home screen
-│   │   ├── subscriptions.tsx # Subscriptions screen
-│   │   └── search.tsx       # Search screen
-│   ├── feed/[id].tsx        # Podcast detail screen
-│   ├── episode/[id].tsx     # Episode detail screen
-│   ├── add-feed.tsx         # Add new feed modal
-│   └── _layout.tsx          # Root layout
+├── app/                           # Expo Router app structure
+│   ├── (tabs)/                   # Main tabbed navigation
+│   │   ├── index.tsx             # Discover/Home screen
+│   │   ├── subscriptions.tsx      # Subscriptions screen
+│   │   ├── search.tsx            # Search screen
+│   │   └── npo.tsx               # NPO programs browser
+│   ├── feed/[id].tsx             # Podcast detail screen
+│   ├── episode/[id].tsx          # Episode detail screen
+│   ├── add-feed.tsx              # Add new feed modal
+│   ├── npo/
+│   │   ├── program/[id].tsx      # Program broadcasts
+│   │   ├── broadcast/[id].tsx    # Broadcast details
+│   │   └── broadcast-items/[id]  # Broadcast segments
+│   └── _layout.tsx               # Root layout
 ├── services/
-│   ├── database.ts          # SQLite database operations
-│   └── rssParser.ts         # RSS/Atom feed parser
+│   ├── database.ts               # SQLite database operations
+│   ├── rssParser.ts              # RSS/Atom feed parser
+│   ├── npoAPI.ts                 # NPO API & mock data
+│   ├── npoDatabase.ts            # NPO SQLite operations
+│   └── database.ts               # Shared database setup
 ├── store/
-│   └── podcastStore.ts      # Zustand state management
-└── types.ts                 # TypeScript interfaces
+│   ├── podcastStore.ts           # Zustand state for podcasts
+│   └── npoStore.ts               # Zustand state for NPO
+├── types/
+│   ├── types.ts                  # Podcast TypeScript interfaces
+│   └── npo.ts                    # NPO TypeScript interfaces
 ```
 
 ## How to Use
@@ -120,6 +131,36 @@ Most podcasts have an RSS feed available:
 - Tap the heart icon on any NPO broadcast to save it
 - Access your favorite broadcasts from the Favorites section
 
+## Content Hierarchy
+
+**Transistor** organizes content in a hierarchical structure:
+
+### Podcasts
+```
+Channel/Podcast
+├── Episode (with RSS metadata)
+```
+
+### NPO Radio Programs
+```
+Radio Channel (Radio 1-6, 3FM)
+├── Program (Show with presenters)
+│   └── Broadcast (Episode/Airing)
+│       └── Item (Segment/Part)
+│           ├── Interview
+│           ├── Music
+│           ├── News
+│           ├── Report
+│           └── Topic
+```
+
+Each **Item** is a distinct segment within a broadcast with:
+- Start time and duration
+- Guests/speakers
+- Topics and subjects
+- Images and descriptions
+- Type-specific metadata (music artist, news content, etc.)
+
 ## Database
 
 The app uses SQLite for local storage:
@@ -130,9 +171,10 @@ The app uses SQLite for local storage:
 - **Subscriptions** - Tracks which podcasts you're subscribed to
 
 ### NPO Radio Programs
-- **Channels** - NPO radio channels (Radio 1-6)
+- **Channels** - NPO radio channels (Radio 1-6, 3FM)
 - **Programs** - Radio shows with presenters and genres
 - **Broadcasts** - Individual broadcast episodes with full metadata
+- **Items** - Segments within broadcasts (interviews, music, news, reports)
 - **Favorites** - User's favorite NPO broadcasts
 
 Data is stored locally on your device for offline access.
