@@ -117,6 +117,36 @@ class DatabaseService {
         )
         """
 
+        let createPlaylistsTable = """
+        CREATE TABLE IF NOT EXISTS playlists (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            item_count INTEGER DEFAULT 0
+        )
+        """
+
+        let createPlaylistItemsTable = """
+        CREATE TABLE IF NOT EXISTS playlist_items (
+            id TEXT PRIMARY KEY,
+            playlist_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            item_type TEXT NOT NULL,
+            broadcast_id TEXT,
+            program_id TEXT,
+            position INTEGER NOT NULL,
+            added_at TEXT NOT NULL,
+            FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+            UNIQUE(playlist_id, item_id)
+        )
+        """
+
+        let createPlaylistItemsIndices = """
+        CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist_id
+        ON playlist_items(playlist_id)
+        """
+
         for createTableSQL in [
             createChannelsTable,
             createProgramsTable,
@@ -125,7 +155,10 @@ class DatabaseService {
             createPodcastFeedsTable,
             createPodcastEpisodesTable,
             createFavoritesTable,
-            createSubscriptionsTable
+            createSubscriptionsTable,
+            createPlaylistsTable,
+            createPlaylistItemsTable,
+            createPlaylistItemsIndices
         ] {
             var errorMessage: UnsafeMutablePointer<Int8>?
             if sqlite3_exec(db, createTableSQL, nil, nil, &errorMessage) != SQLITE_OK {
@@ -358,6 +391,235 @@ class DatabaseService {
         }
         sqlite3_finalize(statement)
         return items
+    }
+
+    // MARK: - Playlist Operations
+
+    func createPlaylist(name: String, description: String? = nil) -> Playlist? {
+        let id = UUID().uuidString
+        let dateFormatter = ISO8601DateFormatter()
+        let createdAt = dateFormatter.string(from: Date())
+
+        let query = """
+        INSERT INTO playlists (id, name, description, created_at, item_count)
+        VALUES (?, ?, ?, ?, 0)
+        """
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, name, -1, SQLITE_TRANSIENT)
+            if let description = description {
+                sqlite3_bind_text(statement, 3, description, -1, SQLITE_TRANSIENT)
+            }
+            sqlite3_bind_text(statement, 4, createdAt, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return Playlist(id: id, name: name, description: description, createdAt: Date(), itemCount: 0)
+            }
+        }
+        sqlite3_finalize(statement)
+        return nil
+    }
+
+    func getAllPlaylists() -> [Playlist] {
+        var playlists: [Playlist] = []
+        let query = "SELECT id, name, description, created_at, item_count FROM playlists ORDER BY created_at DESC"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            let dateFormatter = ISO8601DateFormatter()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(statement, 0))
+                let name = String(cString: sqlite3_column_text(statement, 1))
+                let description = sqlite3_column_text(statement, 2).map { String(cString: $0) }
+                let createdAtString = String(cString: sqlite3_column_text(statement, 3))
+                let itemCount = Int(sqlite3_column_int(statement, 4))
+
+                if let createdAt = dateFormatter.date(from: createdAtString) {
+                    let playlist = Playlist(id: id, name: name, description: description, createdAt: createdAt, itemCount: itemCount)
+                    playlists.append(playlist)
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        return playlists
+    }
+
+    func updatePlaylistName(_ playlistId: String, newName: String) -> Bool {
+        let query = "UPDATE playlists SET name = ? WHERE id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, newName, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, playlistId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func deletePlaylist(_ playlistId: String) -> Bool {
+        let query = "DELETE FROM playlists WHERE id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, playlistId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func addItemToPlaylist(playlistId: String, itemId: String, itemType: PlaylistItemType, broadcastId: String? = nil, programId: String? = nil) -> Bool {
+        // Get next position
+        let maxPosQuery = "SELECT MAX(position) FROM playlist_items WHERE playlist_id = ?"
+        var statement: OpaquePointer?
+        var nextPosition = 0
+
+        if sqlite3_prepare_v2(db, maxPosQuery, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, playlistId, -1, SQLITE_TRANSIENT)
+            if sqlite3_step(statement) == SQLITE_ROW {
+                let maxPos = sqlite3_column_int(statement, 0)
+                nextPosition = maxPos > 0 ? Int(maxPos) + 1 : 1
+            }
+        }
+        sqlite3_finalize(statement)
+
+        // Insert item
+        let id = UUID().uuidString
+        let dateFormatter = ISO8601DateFormatter()
+        let addedAt = dateFormatter.string(from: Date())
+
+        let query = """
+        INSERT INTO playlist_items (id, playlist_id, item_id, item_type, broadcast_id, program_id, position, added_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, playlistId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, itemId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, itemType.rawValue, -1, SQLITE_TRANSIENT)
+            if let broadcastId = broadcastId {
+                sqlite3_bind_text(statement, 5, broadcastId, -1, SQLITE_TRANSIENT)
+            }
+            if let programId = programId {
+                sqlite3_bind_text(statement, 6, programId, -1, SQLITE_TRANSIENT)
+            }
+            sqlite3_bind_int(statement, 7, Int32(nextPosition))
+            sqlite3_bind_text(statement, 8, addedAt, -1, SQLITE_TRANSIENT)
+
+            let success = sqlite3_step(statement) == SQLITE_DONE
+            sqlite3_finalize(statement)
+
+            if success {
+                updatePlaylistItemCount(playlistId)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func getPlaylistItems(_ playlistId: String) -> [PlaylistItem] {
+        var items: [PlaylistItem] = []
+        let query = """
+        SELECT id, playlist_id, item_id, item_type, broadcast_id, program_id, position, added_at
+        FROM playlist_items WHERE playlist_id = ? ORDER BY position ASC
+        """
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, playlistId, -1, SQLITE_TRANSIENT)
+
+            let dateFormatter = ISO8601DateFormatter()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(statement, 0))
+                let playlistId = String(cString: sqlite3_column_text(statement, 1))
+                let itemId = String(cString: sqlite3_column_text(statement, 2))
+                let itemTypeString = String(cString: sqlite3_column_text(statement, 3))
+                let itemType = PlaylistItemType(rawValue: itemTypeString) ?? .npoItem
+                let broadcastId = sqlite3_column_text(statement, 4).map { String(cString: $0) }
+                let programId = sqlite3_column_text(statement, 5).map { String(cString: $0) }
+                let position = Int(sqlite3_column_int(statement, 6))
+                let addedAtString = String(cString: sqlite3_column_text(statement, 7))
+
+                if let addedAt = dateFormatter.date(from: addedAtString) {
+                    let item = PlaylistItem(id: id, playlistId: playlistId, itemId: itemId, itemType: itemType, broadcastId: broadcastId, programId: programId, position: position, addedAt: addedAt)
+                    items.append(item)
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        return items
+    }
+
+    func removeItemFromPlaylist(_ playlistId: String, _ itemId: String) -> Bool {
+        let query = "DELETE FROM playlist_items WHERE playlist_id = ? AND item_id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, playlistId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, itemId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                updatePlaylistItemCount(playlistId)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func isItemInPlaylist(_ playlistId: String, _ itemId: String) -> Bool {
+        let query = "SELECT COUNT(*) FROM playlist_items WHERE playlist_id = ? AND item_id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, playlistId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, itemId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_ROW {
+                let count = sqlite3_column_int(statement, 0)
+                sqlite3_finalize(statement)
+                return count > 0
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    private func updatePlaylistItemCount(_ playlistId: String) {
+        let countQuery = "SELECT COUNT(*) FROM playlist_items WHERE playlist_id = ?"
+        var statement: OpaquePointer?
+        var itemCount = 0
+
+        if sqlite3_prepare_v2(db, countQuery, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, playlistId, -1, SQLITE_TRANSIENT)
+            if sqlite3_step(statement) == SQLITE_ROW {
+                itemCount = Int(sqlite3_column_int(statement, 0))
+            }
+        }
+        sqlite3_finalize(statement)
+
+        let updateQuery = "UPDATE playlists SET item_count = ? WHERE id = ?"
+        if sqlite3_prepare_v2(db, updateQuery, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(itemCount))
+            sqlite3_bind_text(statement, 2, playlistId, -1, SQLITE_TRANSIENT)
+            sqlite3_step(statement)
+        }
+        sqlite3_finalize(statement)
     }
 
     // MARK: - Deinit

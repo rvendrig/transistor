@@ -10,6 +10,13 @@ class NPOViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    // Playlist properties
+    @Published var playlists: [Playlist] = []
+    @Published var playlistItems: [PlaylistItem] = []
+    @Published var selectedPlaylist: Playlist?
+    @Published var isLoadingPlaylists = false
+    @Published var playlistError: String?
+
     private let apiService = NPOAPIService.shared
     private let mockDataService = NPODataService.shared
     private let dbService = DatabaseService.shared
@@ -107,5 +114,153 @@ class NPOViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    // MARK: - Playlists
+
+    func loadPlaylists() {
+        isLoadingPlaylists = true
+        playlistError = nil
+
+        do {
+            playlists = dbService.getAllPlaylists()
+            isLoadingPlaylists = false
+        } catch {
+            playlistError = "Failed to load playlists"
+            isLoadingPlaylists = false
+            print("Error loading playlists: \(error.localizedDescription)")
+        }
+    }
+
+    func createPlaylist(name: String, description: String? = nil) {
+        playlistError = nil
+
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
+            playlistError = "Playlist name cannot be empty"
+            return
+        }
+
+        if let playlist = dbService.createPlaylist(name: name, description: description) {
+            playlists.append(playlist)
+        } else {
+            playlistError = "Failed to create playlist"
+            print("Error: Could not create playlist in database")
+        }
+    }
+
+    func deletePlaylist(_ playlistId: String) {
+        playlistError = nil
+
+        if dbService.deletePlaylist(playlistId) {
+            playlists.removeAll { $0.id == playlistId }
+            if selectedPlaylist?.id == playlistId {
+                selectedPlaylist = nil
+            }
+        } else {
+            playlistError = "Failed to delete playlist"
+            print("Error: Could not delete playlist from database")
+        }
+    }
+
+    func renamePlaylist(_ playlistId: String, newName: String) {
+        playlistError = nil
+
+        guard !newName.trimmingCharacters(in: .whitespaces).isEmpty else {
+            playlistError = "Playlist name cannot be empty"
+            return
+        }
+
+        if dbService.updatePlaylistName(playlistId, newName: newName) {
+            if let index = playlists.firstIndex(where: { $0.id == playlistId }) {
+                playlists[index] = Playlist(
+                    id: playlistId,
+                    name: newName,
+                    description: playlists[index].description,
+                    createdAt: playlists[index].createdAt,
+                    itemCount: playlists[index].itemCount
+                )
+            }
+            if selectedPlaylist?.id == playlistId {
+                selectedPlaylist = Playlist(
+                    id: playlistId,
+                    name: newName,
+                    description: selectedPlaylist?.description,
+                    createdAt: selectedPlaylist?.createdAt ?? Date(),
+                    itemCount: selectedPlaylist?.itemCount ?? 0
+                )
+            }
+        } else {
+            playlistError = "Failed to rename playlist"
+            print("Error: Could not rename playlist in database")
+        }
+    }
+
+    func loadPlaylistItems(_ playlistId: String) {
+        isLoadingPlaylists = true
+        playlistError = nil
+
+        playlistItems = dbService.getPlaylistItems(playlistId)
+        isLoadingPlaylists = false
+    }
+
+    func addToPlaylist(playlistId: String, itemId: String, type: String, broadcastId: String? = nil, programId: String? = nil) {
+        playlistError = nil
+
+        // Check if item already exists in playlist
+        if dbService.isItemInPlaylist(playlistId, itemId) {
+            playlistError = "Item already in playlist"
+            return
+        }
+
+        if dbService.addItemToPlaylist(playlistId: playlistId, itemId: itemId, itemType: type, broadcastId: broadcastId, programId: programId) {
+            // Update playlist item count
+            if let index = playlists.firstIndex(where: { $0.id == playlistId }) {
+                let newCount = playlists[index].itemCount + 1
+                playlists[index] = Playlist(
+                    id: playlists[index].id,
+                    name: playlists[index].name,
+                    description: playlists[index].description,
+                    createdAt: playlists[index].createdAt,
+                    itemCount: newCount
+                )
+            }
+            // Reload items if this is the selected playlist
+            if selectedPlaylist?.id == playlistId {
+                loadPlaylistItems(playlistId)
+            }
+        } else {
+            playlistError = "Failed to add item to playlist"
+            print("Error: Could not add item to playlist")
+        }
+    }
+
+    func addBroadcastToPlaylist(playlistId: String, broadcast: NPOBroadcast, program: NPOProgram) {
+        addToPlaylist(playlistId: playlistId, itemId: broadcast.id, type: "npo_broadcast", broadcastId: broadcast.id, programId: program.id)
+    }
+
+    func addProgramToPlaylist(playlistId: String, program: NPOProgram) {
+        addToPlaylist(playlistId: playlistId, itemId: program.id, type: "npo_program", programId: program.id)
+    }
+
+    func removeFromPlaylist(_ playlistId: String, _ itemId: String) {
+        playlistError = nil
+
+        if dbService.removeItemFromPlaylist(playlistId, itemId) {
+            playlistItems.removeAll { $0.itemId == itemId }
+            // Update playlist item count
+            if let index = playlists.firstIndex(where: { $0.id == playlistId }) {
+                let newCount = max(0, playlists[index].itemCount - 1)
+                playlists[index] = Playlist(
+                    id: playlists[index].id,
+                    name: playlists[index].name,
+                    description: playlists[index].description,
+                    createdAt: playlists[index].createdAt,
+                    itemCount: newCount
+                )
+            }
+        } else {
+            playlistError = "Failed to remove item from playlist"
+            print("Error: Could not remove item from playlist")
+        }
     }
 }

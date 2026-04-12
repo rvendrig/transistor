@@ -137,3 +137,45 @@ struct Subscription: Identifiable, Codable {
     let programId: String
     let subscribedAt: Date
 }
+
+// MARK: - Playlist Models
+struct Playlist: Identifiable, Codable {
+    let id: String
+    let name: String
+    let description: String?
+    let createdAt: Date
+    let itemCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description
+        case createdAt = "created_at"
+        case itemCount = "item_count"
+    }
+}
+
+struct PlaylistItem: Identifiable, Codable {
+    let id: String
+    let playlistId: String
+    let itemId: String
+    let itemType: PlaylistItemType
+    let broadcastId: String?
+    let programId: String?
+    let position: Int
+    let addedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, position
+        case playlistId = "playlist_id"
+        case itemId = "item_id"
+        case itemType = "item_type"
+        case broadcastId = "broadcast_id"
+        case programId = "program_id"
+        case addedAt = "added_at"
+    }
+}
+
+enum PlaylistItemType: String, Codable {
+    case npoItem = "npo_item"
+    case npoBroadcast = "npo_broadcast"
+    case npoProgram = "npo_program"
+}
