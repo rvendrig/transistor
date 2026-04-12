@@ -13,40 +13,29 @@ struct TransistorApp: App {
         WindowGroup {
             ZStack(alignment: .bottom) {
             TabView {
-                // Browse Channels
                 BrowseView()
                     .tabItem {
                         Label("Browse", systemImage: "square.grid.2x2")
                     }
 
-                // Live Guide/Schedule
-                ScheduleView()
-                    .tabItem {
-                        Label("Guide", systemImage: "calendar")
-                    }
-
-                // Playlists
                 PlaylistsView()
                     .tabItem {
                         Label("Playlists", systemImage: "list.bullet")
                     }
 
-                // Listening Hub (History + Commands)
-                ListeningHubView(viewModel: viewModel)
+                LogView(viewModel: viewModel)
                     .tabItem {
-                        Label("Hub", systemImage: "sparkles")
+                        Label("Log", systemImage: "clock.arrow.circlepath")
                     }
 
-                // Providers
-                ProvidersView()
-                    .tabItem {
-                        Label("Providers", systemImage: "network")
-                    }
-
-                // Search
                 SearchView()
                     .tabItem {
-                        Label("Search", systemImage: "magnifyingglass")
+                        Label("Zoeken", systemImage: "magnifyingglass")
+                    }
+
+                SettingsView()
+                    .tabItem {
+                        Label("Instellingen", systemImage: "gearshape")
                     }
             }
             .preferredColorScheme(.dark)

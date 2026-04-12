@@ -38,7 +38,9 @@
 		B36903D4AC74E14D04772429 /* NPOViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5B89214D5E783991B857DA /* NPOViewModel.swift */; };
 		C92C3166F63C5F6378342970 /* NPOItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99309D56701ED7DDB6A6579A /* NPOItemDetailView.swift */; };
 		E503C37428705ADA96EF5559 /* NPOProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B815790244BD61BEC25BEEE2 /* NPOProvider.swift */; };
+		E56E1DDF3D8088FF92E9565A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E44641870D2759C9974E7DC /* SettingsView.swift */; };
 		E86480481E44EA9645079539 /* AddToPlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B055A7E0D5846B379EB6C85F /* AddToPlaylistView.swift */; };
+		E8938C247F5AD37651BB6F8B /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D3F687D3C46D2638154257 /* LogView.swift */; };
 		EE56E21A092C4251D68E8338 /* PlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC9AF6C1D4E2FE5795DCF2F /* PlaybackView.swift */; };
 		F3D4A947515D9A93561BA45D /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595BB61A1E28FCDB942FAA06 /* BrowseView.swift */; };
 		F57E8419ABCB49DF6660C3BE /* ListeningHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133FA771247F60BB856AEA5A /* ListeningHubView.swift */; };
@@ -67,8 +69,10 @@
 		595BB61A1E28FCDB942FAA06 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkerListView.swift; sourceTree = "<group>"; };
 		6E2BAD73B3FAC606FA35D8E0 /* NPOChannelsViewUpdated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOChannelsViewUpdated.swift; sourceTree = "<group>"; };
+		84D3F687D3C46D2638154257 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		87A528907094F7D1C1D9FA8F /* ListeningLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningLogView.swift; sourceTree = "<group>"; };
 		8AC4265DAC1BD0E98D7C0E8C /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		8E44641870D2759C9974E7DC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8E841B1C3A21E52F70A1DA7E /* PlaylistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistsView.swift; sourceTree = "<group>"; };
 		93603E59A3CF17057CA1E97E /* ContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentProvider.swift; sourceTree = "<group>"; };
 		99309D56701ED7DDB6A6579A /* NPOItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOItemDetailView.swift; sourceTree = "<group>"; };
@@ -157,6 +161,7 @@
 				133FA771247F60BB856AEA5A /* ListeningHubView.swift */,
 				87A528907094F7D1C1D9FA8F /* ListeningLogView.swift */,
 				1DC020F1E0389E967E596F88 /* LivePlaybackDisplay.swift */,
+				84D3F687D3C46D2638154257 /* LogView.swift */,
 				4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */,
 				69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */,
 				6E2BAD73B3FAC606FA35D8E0 /* NPOChannelsViewUpdated.swift */,
@@ -168,6 +173,7 @@
 				035B68226F58B6FB6E4777F4 /* ProvidersView.swift */,
 				B5EA90853F4B66CE0F00FC64 /* ScheduleView.swift */,
 				CAE3EB1F1011EBC185C29A77 /* SearchView.swift */,
+				8E44641870D2759C9974E7DC /* SettingsView.swift */,
 				62C063E61EC636380AEF0520 /* Wizards */,
 			);
 			path = Views;
@@ -273,6 +279,7 @@
 				F57E8419ABCB49DF6660C3BE /* ListeningHubView.swift in Sources */,
 				9F40AE23AB43523A968D0AE3 /* ListeningLogView.swift in Sources */,
 				90FC94C53701E51B41528ADA /* LivePlaybackDisplay.swift in Sources */,
+				E8938C247F5AD37651BB6F8B /* LogView.swift in Sources */,
 				609C31175D48B87946D98891 /* MarkerCreationSheet.swift in Sources */,
 				64D24608784059587A20FFFA /* MarkerListView.swift in Sources */,
 				5D0FC6EEA3668F0FA7F04FC6 /* Models.swift in Sources */,
@@ -291,6 +298,7 @@
 				F76E8712E970DA7CA78AFAAF /* ScheduleModels.swift in Sources */,
 				09A880B7AC2DD8C9157F452D /* ScheduleView.swift in Sources */,
 				A97CF357FCAC065F1DD429F3 /* SearchView.swift in Sources */,
+				E56E1DDF3D8088FF92E9565A /* SettingsView.swift in Sources */,
 				1DD5E72BC9748EA9CF4419D6 /* TransistorApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

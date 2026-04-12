@@ -34,6 +34,10 @@ class AudioPlayerService: NSObject, ObservableObject {
     @Published var currentTitle: String?
     @Published var currentImageUrl: String?
     @Published var isLiveStream = false
+    @Published var currentSource: String?
+
+    private let dbService = DatabaseService.shared
+    private var currentSessionId: String?
 
     func play(content: AudioContent) async {
         guard let urlString = content.audioUrl else {
@@ -42,22 +46,54 @@ class AudioPlayerService: NSObject, ObservableObject {
         }
         currentTitle = content.title
         currentImageUrl = content.image
+        currentSource = content.providerId
         isLiveStream = false
         await playURL(urlString)
+        startSession(title: content.title, source: content.providerId, contentType: content.contentType, duration: content.duration)
     }
 
-    func playLive(url: String, title: String, imageUrl: String? = nil) async {
+    func playLive(url: String, title: String, imageUrl: String? = nil, source: String = "npo") async {
         currentTitle = title
         currentImageUrl = imageUrl
+        currentSource = source
         isLiveStream = true
         await playURL(url)
+        startSession(title: title, source: source, contentType: .stream, duration: 0)
     }
 
-    func playOnDemand(url: String, title: String, imageUrl: String? = nil) async {
+    func playOnDemand(url: String, title: String, imageUrl: String? = nil, source: String = "npo") async {
         currentTitle = title
         currentImageUrl = imageUrl
+        currentSource = source
         isLiveStream = false
         await playURL(url)
+        startSession(title: title, source: source, contentType: .broadcast, duration: Int(duration))
+    }
+
+    private func startSession(title: String, source: String, contentType: ContentType, duration: Int) {
+        endCurrentSession()
+        if let session = dbService.createListeningSession(
+            contentId: title,
+            contentType: contentType,
+            providerId: source,
+            title: title,
+            source: source,
+            duration: duration,
+            categories: [],
+            topics: [],
+            guests: [],
+            artists: []
+        ) {
+            currentSessionId = session.id
+        }
+    }
+
+    private func endCurrentSession() {
+        if let sessionId = currentSessionId {
+            _ = dbService.updateListeningSessionProgress(sessionId, progress: Int(currentTime))
+            _ = dbService.endListeningSession(sessionId)
+            currentSessionId = nil
+        }
     }
 
     private func playURL(_ urlString: String) async {
@@ -106,11 +142,15 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
 
     func stop() {
+        endCurrentSession()
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         isPlaying = false
         currentTime = 0
         currentContent = nil
+        currentTitle = nil
+        currentImageUrl = nil
+        currentSource = nil
     }
 
     func seek(to seconds: Double) {

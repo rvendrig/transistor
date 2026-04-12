@@ -6,58 +6,116 @@ struct BrowseView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    Text("Kies een zender")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal)
+                VStack(alignment: .leading, spacing: 20) {
+                    // MARK: Radio sectie
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Radio")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal)
 
-                    if viewModel.isLoadingChannels {
-                        HStack {
-                            ProgressView()
-                                .tint(.transistorGreen)
-                            Text("Laden...")
-                                .foregroundColor(.gray)
+                        if viewModel.isLoadingChannels {
+                            HStack {
+                                ProgressView().tint(.transistorGreen)
+                                Text("Laden...").foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                            ForEach(Array(viewModel.channels.enumerated()), id: \.element.id) { index, channel in
+                                NavigationLink(value: channel) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(channel.currentTitle)
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.white)
+                                        Text(channel.description)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                            .lineLimit(2)
+                                        Spacer()
+                                    }
+                                    .frame(height: 100)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding()
+                                    .background(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                Color(hue: Double(index) / max(Double(viewModel.channels.count), 1), saturation: 0.7, brightness: 0.5),
+                                                Color(hue: Double(index) / max(Double(viewModel.channels.count), 1), saturation: 0.7, brightness: 0.3),
+                                            ]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .cornerRadius(12)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
                     }
 
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
-                        ForEach(Array(viewModel.channels.enumerated()), id: \.element.id) { index, channel in
-                            NavigationLink(value: channel) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text(channel.currentTitle)
-                                        .font(.headline)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
+                    // MARK: Podcasts sectie
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Podcasts")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            Spacer()
+                            Button(action: { /* TODO: voeg podcast toe */ }) {
+                                Label("Voeg toe", systemImage: "plus.circle.fill")
+                                    .font(.subheadline)
+                                    .foregroundColor(.transistorGreen)
+                            }
+                        }
+                        .padding(.horizontal)
 
-                                    Text(channel.description)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                        .lineLimit(2)
+                        let podcasts = ContentEnrichmentService.shared.getPopularPodcasts()
+                        if podcasts.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "mic")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.gray)
+                                Text("Voeg een podcast toe via RSS")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                        } else {
+                            ForEach(podcasts, id: \.id) { podcast in
+                                HStack(spacing: 12) {
+                                    Image(systemName: "mic.fill")
+                                        .foregroundColor(.transistorGreen)
+                                        .frame(width: 40, height: 40)
+                                        .background(Color.cardBg)
+                                        .cornerRadius(8)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(podcast.title)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+                                        Text(podcast.description)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                            .lineLimit(1)
+                                    }
 
                                     Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
                                 }
-                                .frame(height: 120)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(hue: Double(index) / max(Double(viewModel.channels.count), 1), saturation: 0.7, brightness: 0.5),
-                                            Color(hue: Double(index) / max(Double(viewModel.channels.count), 1), saturation: 0.7, brightness: 0.3),
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .cornerRadius(12)
+                                .padding(.horizontal)
                             }
                         }
                     }
-                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }
@@ -83,6 +141,9 @@ struct BrowseView: View {
 struct BrowseScheduleView: View {
     let channel: Channel
     @ObservedObject var viewModel: ContentViewModel
+    @State private var selectedDate = Date()
+    @State private var broadcasts: [Broadcast] = []
+    @State private var isLoading = false
 
     private let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -90,71 +151,166 @@ struct BrowseScheduleView: View {
         return f
     }()
 
+    private let dateDisplayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "nl_NL")
+        f.dateFormat = "EEE d MMM yyyy"
+        return f
+    }()
+
+    // Shortcuts: nieuws, weer, verkeer uitzendingen herkennen aan titel
+    var shortcuts: [(icon: String, label: String, broadcast: Broadcast?)] {
+        let news = broadcasts.last(where: { isShortcutMatch($0, keywords: ["journaal", "nieuws", "nos"]) })
+        let weather = broadcasts.last(where: { isShortcutMatch($0, keywords: ["weer", "weerbericht"]) })
+        let traffic = broadcasts.last(where: { isShortcutMatch($0, keywords: ["verkeer", "anwb", "file"]) })
+
+        var result: [(String, String, Broadcast?)] = []
+        if news != nil { result.append(("newspaper", "Nieuws", news)) }
+        if weather != nil { result.append(("cloud.sun", "Weer", weather)) }
+        if traffic != nil { result.append(("car", "Verkeer", traffic)) }
+        return result
+    }
+
     var body: some View {
-        List {
-            if viewModel.isLoading {
-                HStack {
-                    ProgressView()
-                        .tint(.transistorGreen)
-                    Text("Laden...")
+        VStack(spacing: 0) {
+            // Dag-navigatie
+            HStack {
+                Button(action: { changeDate(by: -1) }) {
+                    Image(systemName: "chevron.left")
+                        .font(.title3)
+                        .foregroundColor(.transistorGreen)
+                }
+
+                Spacer()
+
+                VStack(spacing: 2) {
+                    if Calendar.current.isDateInToday(selectedDate) {
+                        Text("Vandaag")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.transistorGreen)
+                    }
+                    Text(dateDisplayFormatter.string(from: selectedDate))
+                        .font(.caption)
                         .foregroundColor(.gray)
                 }
+
+                Spacer()
+
+                Button(action: { changeDate(by: 1) }) {
+                    Image(systemName: "chevron.right")
+                        .font(.title3)
+                        .foregroundColor(.transistorGreen)
+                }
             }
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(Color.cardBg)
 
-            ForEach(viewModel.broadcasts) { broadcast in
-                NavigationLink(value: broadcast) {
-                    HStack(alignment: .top, spacing: 12) {
-                        // Tijdblok
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(timeFormatter.string(from: broadcast.startTime))
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(isNow(broadcast) ? .transistorGreen : .white)
-
-                            let endTime = broadcast.startTime.addingTimeInterval(Double(broadcast.duration))
-                            Text(timeFormatter.string(from: endTime))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .frame(width: 45)
-
-                        // Programma-info
-                        VStack(alignment: .leading, spacing: 4) {
-                            if isNow(broadcast) {
-                                Text("NU")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.transistorGreen)
-                                    .cornerRadius(4)
-                            }
-
-                            Text(broadcast.displayTitle)
-                                .font(.headline)
-                                .foregroundColor(.white)
-
-                            if let description = broadcast.description, !description.isEmpty {
-                                Text(description)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .lineLimit(2)
+            // Shortcuts (nieuws/weer/verkeer)
+            if !shortcuts.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(shortcuts, id: \.label) { shortcut in
+                            if let broadcast = shortcut.broadcast {
+                                NavigationLink(value: broadcast) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: shortcut.icon)
+                                            .font(.caption)
+                                        Text(shortcut.label)
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.cardBg)
+                                    .cornerRadius(20)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(Color.transistorGreen.opacity(0.5), lineWidth: 1)
+                                    )
+                                }
                             }
                         }
                     }
-                    .padding(.vertical, 6)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 }
             }
+
+            // Programma-lijst
+            List {
+                if isLoading {
+                    HStack {
+                        ProgressView().tint(.transistorGreen)
+                        Text("Laden...").foregroundColor(.gray)
+                    }
+                }
+
+                ForEach(broadcasts) { broadcast in
+                    NavigationLink(value: broadcast) {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(timeFormatter.string(from: broadcast.startTime))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(isNow(broadcast) ? .transistorGreen : .white)
+                                let endTime = broadcast.startTime.addingTimeInterval(Double(broadcast.duration))
+                                Text(timeFormatter.string(from: endTime))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(width: 45)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                if isNow(broadcast) {
+                                    Text("NU")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.transistorGreen)
+                                        .cornerRadius(4)
+                                }
+                                Text(broadcast.displayTitle)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                if let desc = broadcast.description, !desc.isEmpty {
+                                    Text(desc)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                        .lineLimit(2)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                }
+            }
+            .listStyle(.plain)
         }
-        .listStyle(.plain)
         .navigationTitle(channel.currentTitle)
         .background(Color.darkBg)
         .onAppear {
-            Task {
-                await loadSchedule()
-            }
+            Task { await loadSchedule() }
         }
+        .gesture(
+            DragGesture(minimumDistance: 50)
+                .onEnded { value in
+                    if value.translation.width > 50 {
+                        changeDate(by: -1)
+                    } else if value.translation.width < -50 {
+                        changeDate(by: 1)
+                    }
+                }
+        )
+    }
+
+    private func changeDate(by days: Int) {
+        selectedDate = Calendar.current.date(byAdding: .day, value: days, to: selectedDate) ?? selectedDate
+        Task { await loadSchedule() }
     }
 
     private func isNow(_ broadcast: Broadcast) -> Bool {
@@ -163,15 +319,43 @@ struct BrowseScheduleView: View {
         return broadcast.startTime <= now && now <= endTime
     }
 
+    private func isShortcutMatch(_ broadcast: Broadcast, keywords: [String]) -> Bool {
+        let title = broadcast.displayTitle.lowercased()
+        return keywords.contains(where: { title.contains($0) })
+    }
+
     private func loadSchedule() async {
         guard let provider = viewModel.providerStore.provider(byId: channel.providerId) else { return }
-        viewModel.isLoading = true
+        isLoading = true
         do {
-            viewModel.broadcasts = try await provider.fetchBroadcasts(forChannel: channel.id)
+            if Calendar.current.isDateInToday(selectedDate) {
+                broadcasts = try await provider.fetchBroadcasts(forChannel: channel.id)
+            } else {
+                // Voor andere dagen: probeer uitzendingen-pagina te scrapen
+                let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channel.id)
+                // Filter op datum — de list items hebben formattedDate maar geen exacte datum
+                // Voorlopig tonen we de beschikbare uitzendingen
+                broadcasts = list.compactMap { item in
+                    Broadcast(
+                        id: item.url,
+                        providerId: "npo",
+                        title: item.title,
+                        showId: nil,
+                        channelId: channel.id,
+                        seasonId: nil,
+                        startTime: selectedDate,
+                        duration: 0,
+                        description: item.time,
+                        image: item.imageUrl,
+                        audioUrl: nil,
+                        titleOverride: nil
+                    )
+                }
+            }
         } catch {
             viewModel.errorMessage = error.localizedDescription
         }
-        viewModel.isLoading = false
+        isLoading = false
     }
 }
 
