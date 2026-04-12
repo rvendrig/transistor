@@ -147,6 +147,38 @@ class DatabaseService {
         ON playlist_items(playlist_id)
         """
 
+        let createMarkersTable = """
+        CREATE TABLE IF NOT EXISTS npo_markers (
+            id TEXT PRIMARY KEY,
+            broadcast_id TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            tags TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(broadcast_id) REFERENCES npo_broadcasts(id) ON DELETE CASCADE
+        )
+        """
+
+        let createMarkersIndices = """
+        CREATE INDEX IF NOT EXISTS idx_npo_markers_broadcast_id
+        ON npo_markers(broadcast_id)
+        """
+
+        let createNPOFavoritesTable = """
+        CREATE TABLE IF NOT EXISTS npo_favorites (
+            id TEXT PRIMARY KEY,
+            broadcast_id TEXT NOT NULL,
+            item_type TEXT,
+            program_id TEXT,
+            added_at TEXT NOT NULL,
+            FOREIGN KEY(broadcast_id) REFERENCES npo_broadcasts(id) ON DELETE CASCADE
+        )
+        """
+
+        let createNPOFavoritesIndices = """
+        CREATE INDEX IF NOT EXISTS idx_npo_favorites_broadcast_id
+        ON npo_favorites(broadcast_id)
+        """
+
         for createTableSQL in [
             createChannelsTable,
             createProgramsTable,
@@ -158,7 +190,11 @@ class DatabaseService {
             createSubscriptionsTable,
             createPlaylistsTable,
             createPlaylistItemsTable,
-            createPlaylistItemsIndices
+            createPlaylistItemsIndices,
+            createMarkersTable,
+            createMarkersIndices,
+            createNPOFavoritesTable,
+            createNPOFavoritesIndices
         ] {
             var errorMessage: UnsafeMutablePointer<Int8>?
             if sqlite3_exec(db, createTableSQL, nil, nil, &errorMessage) != SQLITE_OK {
@@ -620,6 +656,176 @@ class DatabaseService {
             sqlite3_step(statement)
         }
         sqlite3_finalize(statement)
+    }
+
+    // MARK: - Marker Operations
+
+    func createMarker(broadcastId: String, timestamp: Int, tags: [String]) -> NPOMarker? {
+        let id = UUID().uuidString
+        let dateFormatter = ISO8601DateFormatter()
+        let createdAt = dateFormatter.string(from: Date())
+
+        let tagsJSON = (try? JSONSerialization.data(withJSONObject: tags)) ?? Data()
+        let query = """
+        INSERT INTO npo_markers (id, broadcast_id, timestamp, tags, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, broadcastId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int(statement, 3, Int32(timestamp))
+            sqlite3_bind_blob(statement, 4, (tagsJSON as NSData).bytes, Int32(tagsJSON.count), SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 5, createdAt, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return NPOMarker(id: id, broadcastId: broadcastId, timestamp: timestamp, tags: tags, createdAt: Date())
+            }
+        }
+        sqlite3_finalize(statement)
+        return nil
+    }
+
+    func getMarkersByBroadcast(_ broadcastId: String) -> [NPOMarker] {
+        var markers: [NPOMarker] = []
+        let query = "SELECT id, broadcast_id, timestamp, tags, created_at FROM npo_markers WHERE broadcast_id = ? ORDER BY timestamp ASC"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+
+            let dateFormatter = ISO8601DateFormatter()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(statement, 0))
+                let broadcastId = String(cString: sqlite3_column_text(statement, 1))
+                let timestamp = Int(sqlite3_column_int(statement, 2))
+                let createdAtString = String(cString: sqlite3_column_text(statement, 4))
+
+                var tags: [String] = []
+                if let data = sqlite3_column_blob(statement, 3) {
+                    let length = sqlite3_column_bytes(statement, 3)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        tags = parsed
+                    }
+                }
+
+                if let createdAt = dateFormatter.date(from: createdAtString) {
+                    let marker = NPOMarker(id: id, broadcastId: broadcastId, timestamp: timestamp, tags: tags, createdAt: createdAt)
+                    markers.append(marker)
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        return markers
+    }
+
+    func deleteMarker(_ markerId: String) -> Bool {
+        let query = "DELETE FROM npo_markers WHERE id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, markerId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    // MARK: - Favorites Operations
+
+    func addFavorite(broadcastId: String, itemType: String? = nil, programId: String? = nil) -> NPOFavorite? {
+        let id = UUID().uuidString
+        let dateFormatter = ISO8601DateFormatter()
+        let addedAt = dateFormatter.string(from: Date())
+
+        let query = """
+        INSERT OR REPLACE INTO npo_favorites (id, broadcast_id, item_type, program_id, added_at)
+        VALUES (?, ?, ?, ?, ?)
+        """
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, broadcastId, -1, SQLITE_TRANSIENT)
+            if let itemType = itemType {
+                sqlite3_bind_text(statement, 3, itemType, -1, SQLITE_TRANSIENT)
+            }
+            if let programId = programId {
+                sqlite3_bind_text(statement, 4, programId, -1, SQLITE_TRANSIENT)
+            }
+            sqlite3_bind_text(statement, 5, addedAt, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return NPOFavorite(id: id, broadcastId: broadcastId, itemType: itemType, programId: programId, addedAt: Date())
+            }
+        }
+        sqlite3_finalize(statement)
+        return nil
+    }
+
+    func removeFavorite(_ broadcastId: String) -> Bool {
+        let query = "DELETE FROM npo_favorites WHERE broadcast_id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func isFavorite(_ broadcastId: String) -> Bool {
+        let query = "SELECT COUNT(*) FROM npo_favorites WHERE broadcast_id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, broadcastId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_ROW {
+                let count = sqlite3_column_int(statement, 0)
+                sqlite3_finalize(statement)
+                return count > 0
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func getAllFavorites() -> [NPOFavorite] {
+        var favorites: [NPOFavorite] = []
+        let query = "SELECT id, broadcast_id, item_type, program_id, added_at FROM npo_favorites ORDER BY added_at DESC"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            let dateFormatter = ISO8601DateFormatter()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(statement, 0))
+                let broadcastId = String(cString: sqlite3_column_text(statement, 1))
+                let itemType = sqlite3_column_text(statement, 2).map { String(cString: $0) }
+                let programId = sqlite3_column_text(statement, 3).map { String(cString: $0) }
+                let addedAtString = String(cString: sqlite3_column_text(statement, 4))
+
+                if let addedAt = dateFormatter.date(from: addedAtString) {
+                    let favorite = NPOFavorite(id: id, broadcastId: broadcastId, itemType: itemType, programId: programId, addedAt: addedAt)
+                    favorites.append(favorite)
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        return favorites
     }
 
     // MARK: - Deinit
