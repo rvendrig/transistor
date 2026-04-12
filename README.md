@@ -139,33 +139,54 @@ Data is stored locally on your device for offline access.
 
 ## NPO Radio Channels
 
-**Transistor** provides full access to all major NPO radio channels:
+**Transistor** provides full access to all major NPO radio channels and podcasts:
+
+### Radio Channels
 
 | Channel | Description | Focus |
 |---------|-------------|-------|
 | **NPO Radio 1** | News and culture | Current affairs, interviews, documentaries |
 | **NPO Radio 2** | Pop and rock | Music, nostalgia, entertainment |
+| **3FM** | Pop & youth | Modern music, young talent, entertainment |
 | **NPO Radio 4** | Classical music | Classical, opera, orchestral music |
 | **NPO Radio 5** | World music | International music, world cultures |
 | **NPO Radio 6** | Jazz | Jazz, blues, improvisation |
 
-Each channel offers:
-- Browse all available programs
+### Podcasts by Channel
+
+- **NPO Radio 1**: Eo Verantwoording (interviews & debates)
+- **NPO Radio 2**: Luistergoud (personal stories & culture)
+- **3FM**: 
+  - Funx (Hip hop & R&B)
+  - Tomorrow Land Stories (Electronic music festival)
+- **NPO Radio 4**: De Wereld van Opera (Classical deep dives)
+- **NPO Radio 5**: Reizen rond de wereld (Travel & culture stories)
+- **NPO Radio 6**: Jazz Talk (Jazz musician interviews)
+
+### Features for Each Program
+
+- Browse all available broadcasts/episodes
 - View presenter information
-- See guest appearances
+- See guest appearances and interviews
 - Track music played during broadcasts
-- Check broadcast schedules
+- Check broadcast schedules and dates
 - Save favorite broadcasts
+- Full episode descriptions
+- Topic and subject tags
+- Duration and timing information
 
 ## Current Features
 
 ### NPO Integration
-- ✅ Browse all NPO radio channels
+- ✅ Browse all NPO radio channels (Radio 1, 2, 3FM, 4, 5, 6)
+- ✅ Access dedicated NPO podcast section
 - ✅ View program schedules and details
 - ✅ See presenter and guest information
 - ✅ Track music played during broadcasts
 - ✅ Search across all NPO content
 - ✅ Save favorite broadcasts
+- ✅ Filter by channel, genre, presenter
+- ✅ Browse podcasts across all channels
 
 ### Custom Podcasts
 - ✅ Add podcasts via RSS feed URLs
