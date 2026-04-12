@@ -5,21 +5,31 @@ struct TransistorApp: App {
     var body: some Scene {
         WindowGroup {
             TabView {
+                // NPO/Channels Navigation
                 NPOChannelsViewV2()
                     .tabItem {
-                        Label("NPO", systemImage: "radio.fill")
+                        Label("Browse", systemImage: "square.grid.2x2")
                     }
 
+                // Live Guide/Schedule
+                ScheduleView()
+                    .tabItem {
+                        Label("Guide", systemImage: "calendar")
+                    }
+
+                // Playlists
                 PlaylistsView()
                     .tabItem {
                         Label("Playlists", systemImage: "list.bullet")
                     }
 
-                DiscoverView()
+                // Providers
+                ProvidersView()
                     .tabItem {
-                        Label("Discover", systemImage: "sparkles")
+                        Label("Providers", systemImage: "network")
                     }
 
+                // Search
                 SearchView()
                     .tabItem {
                         Label("Search", systemImage: "magnifyingglass")
