@@ -35,6 +35,12 @@ class ContentViewModel: ObservableObject {
     @Published var isLoadingFavorites = false
     @Published var favoriteError: String?
 
+    // MARK: - Listening Session properties
+    @Published var listeningHistory: [ListeningSession] = []
+    @Published var currentListeningSession: ListeningSession?
+    @Published var isLoadingListeningHistory = false
+    @Published var listeningSessionError: String?
+
     // MARK: - Search
     @Published var searchResults: UnifiedSearchResult = UnifiedSearchResult(programs: [], broadcasts: [], episodes: [])
     @Published var isSearching = false
@@ -288,5 +294,82 @@ class ContentViewModel: ObservableObject {
 
     func isFavorited(_ contentId: String) -> Bool {
         isFavoritedContent.contains(contentId)
+    }
+
+    // MARK: - Listening Session Methods
+    func loadListeningHistory(limit: Int = 50) {
+        isLoadingListeningHistory = true
+        listeningSessionError = nil
+
+        do {
+            listeningHistory = dbService.getListeningHistory(limit: limit)
+            isLoadingListeningHistory = false
+        } catch {
+            listeningSessionError = "Failed to load listening history"
+            isLoadingListeningHistory = false
+            print("Error loading listening history: \(error.localizedDescription)")
+        }
+    }
+
+    func startListeningSession(contentId: String, contentType: ContentType, providerId: String, title: String, source: String, duration: Int, categories: [ContentCategory] = [], topics: [String] = [], guests: [String] = [], artists: [String] = []) {
+        listeningSessionError = nil
+
+        if let session = dbService.createListeningSession(contentId: contentId, contentType: contentType, providerId: providerId, title: title, source: source, duration: duration, categories: categories, topics: topics, guests: guests, artists: artists) {
+            currentListeningSession = session
+            listeningHistory.insert(session, at: 0)
+        } else {
+            listeningSessionError = "Failed to start listening session"
+        }
+    }
+
+    func updateCurrentSessionProgress(_ progress: Int) {
+        listeningSessionError = nil
+
+        guard let session = currentListeningSession else {
+            listeningSessionError = "No active listening session"
+            return
+        }
+
+        if dbService.updateListeningSessionProgress(session.id, progress: progress) {
+            // Update local copy
+            if let index = listeningHistory.firstIndex(where: { $0.id == session.id }) {
+                listeningHistory[index].progress = progress
+                currentListeningSession?.progress = progress
+            }
+        } else {
+            listeningSessionError = "Failed to update session progress"
+        }
+    }
+
+    func endCurrentListeningSession() {
+        listeningSessionError = nil
+
+        guard let session = currentListeningSession else {
+            listeningSessionError = "No active listening session"
+            return
+        }
+
+        if dbService.endListeningSession(session.id) {
+            currentListeningSession = nil
+        } else {
+            listeningSessionError = "Failed to end listening session"
+        }
+    }
+
+    func getListeningHistoryByCategory(_ category: ContentCategory, limit: Int = 50) -> [ListeningSession] {
+        return dbService.getListeningSessionsByCategory(category, limit: limit)
+    }
+
+    func addNoteToListeningSession(_ sessionId: String, note: String) {
+        listeningSessionError = nil
+
+        if dbService.addNoteToListeningSession(sessionId, note: note) {
+            // Update local copy
+            if let index = listeningHistory.firstIndex(where: { $0.id == sessionId }) {
+                listeningHistory[index].notes = note
+            }
+        } else {
+            listeningSessionError = "Failed to add note to session"
+        }
     }
 }

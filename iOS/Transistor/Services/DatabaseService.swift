@@ -171,6 +171,38 @@ class DatabaseService {
         ON favorites(content_id)
         """
 
+        let createListeningSessionsTable = """
+        CREATE TABLE IF NOT EXISTS listening_sessions (
+            id TEXT PRIMARY KEY,
+            content_id TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            source TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT,
+            duration INTEGER NOT NULL,
+            progress INTEGER DEFAULT 0,
+            categories TEXT,
+            topics TEXT,
+            guests TEXT,
+            artists TEXT,
+            notes TEXT,
+            is_favorited INTEGER DEFAULT 0,
+            marker_count INTEGER DEFAULT 0
+        )
+        """
+
+        let createListeningSessionsIndices = """
+        CREATE INDEX IF NOT EXISTS idx_listening_sessions_content_id
+        ON listening_sessions(content_id)
+        """
+
+        let createListeningSessionsDateIndices = """
+        CREATE INDEX IF NOT EXISTS idx_listening_sessions_start_time
+        ON listening_sessions(start_time)
+        """
+
         for createTableSQL in [
             createChannelsTable,
             createProgramsTable,
@@ -185,7 +217,10 @@ class DatabaseService {
             createMarkersTable,
             createMarkersIndices,
             createFavoritesTable,
-            createFavoritesIndices
+            createFavoritesIndices,
+            createListeningSessionsTable,
+            createListeningSessionsIndices,
+            createListeningSessionsDateIndices
         ] {
             var errorMessage: UnsafeMutablePointer<Int8>?
             if sqlite3_exec(db, createTableSQL, nil, nil, &errorMessage) != SQLITE_OK {
@@ -819,6 +854,298 @@ class DatabaseService {
         }
         sqlite3_finalize(statement)
         return favorites
+    }
+
+    // MARK: - Listening Session Operations
+
+    func createListeningSession(contentId: String, contentType: ContentType, providerId: String, title: String, source: String, duration: Int, categories: [ContentCategory] = [], topics: [String] = [], guests: [String] = [], artists: [String] = []) -> ListeningSession? {
+        let id = UUID().uuidString
+        let dateFormatter = ISO8601DateFormatter()
+        let startTime = dateFormatter.string(from: Date())
+
+        let categoriesJSON = (try? JSONSerialization.data(withJSONObject: categories.map { $0.rawValue })) ?? Data()
+        let topicsJSON = (try? JSONSerialization.data(withJSONObject: topics)) ?? Data()
+        let guestsJSON = (try? JSONSerialization.data(withJSONObject: guests)) ?? Data()
+        let artistsJSON = (try? JSONSerialization.data(withJSONObject: artists)) ?? Data()
+
+        let query = """
+        INSERT INTO listening_sessions (id, content_id, content_type, provider_id, title, source, start_time, duration, categories, topics, guests, artists)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, id, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, contentId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 3, contentType.rawValue, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 4, providerId, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 5, title, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 6, source, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 7, startTime, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int(statement, 8, Int32(duration))
+            sqlite3_bind_blob(statement, 9, (categoriesJSON as NSData).bytes, Int32(categoriesJSON.count), SQLITE_TRANSIENT)
+            sqlite3_bind_blob(statement, 10, (topicsJSON as NSData).bytes, Int32(topicsJSON.count), SQLITE_TRANSIENT)
+            sqlite3_bind_blob(statement, 11, (guestsJSON as NSData).bytes, Int32(guestsJSON.count), SQLITE_TRANSIENT)
+            sqlite3_bind_blob(statement, 12, (artistsJSON as NSData).bytes, Int32(artistsJSON.count), SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return ListeningSession(
+                    id: id,
+                    contentId: contentId,
+                    contentType: contentType,
+                    providerId: providerId,
+                    title: title,
+                    source: source,
+                    startTime: Date(),
+                    duration: duration,
+                    progress: 0,
+                    categories: categories,
+                    topics: topics,
+                    guests: guests,
+                    artists: artists,
+                    isFavorited: false,
+                    markerCount: 0
+                )
+            }
+        }
+        sqlite3_finalize(statement)
+        return nil
+    }
+
+    func updateListeningSessionProgress(_ sessionId: String, progress: Int) -> Bool {
+        let query = "UPDATE listening_sessions SET progress = ? WHERE id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(progress))
+            sqlite3_bind_text(statement, 2, sessionId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func endListeningSession(_ sessionId: String) -> Bool {
+        let dateFormatter = ISO8601DateFormatter()
+        let endTime = dateFormatter.string(from: Date())
+        let query = "UPDATE listening_sessions SET end_time = ? WHERE id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, endTime, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, sessionId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
+    }
+
+    func getListeningHistory(limit: Int = 50) -> [ListeningSession] {
+        var sessions: [ListeningSession] = []
+        let query = "SELECT id, content_id, content_type, provider_id, title, source, start_time, end_time, duration, progress, categories, topics, guests, artists, notes, is_favorited, marker_count FROM listening_sessions ORDER BY start_time DESC LIMIT ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(limit))
+
+            let dateFormatter = ISO8601DateFormatter()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(statement, 0))
+                let contentId = String(cString: sqlite3_column_text(statement, 1))
+                let contentTypeString = String(cString: sqlite3_column_text(statement, 2))
+                let contentType = ContentType(rawValue: contentTypeString) ?? .broadcast
+                let providerId = String(cString: sqlite3_column_text(statement, 3))
+                let title = String(cString: sqlite3_column_text(statement, 4))
+                let source = String(cString: sqlite3_column_text(statement, 5))
+                let startTimeString = String(cString: sqlite3_column_text(statement, 6))
+                let endTimeString = sqlite3_column_text(statement, 7).map { String(cString: $0) }
+                let duration = Int(sqlite3_column_int(statement, 8))
+                let progress = Int(sqlite3_column_int(statement, 9))
+                let notes = sqlite3_column_text(statement, 14).map { String(cString: $0) }
+                let isFavorited = sqlite3_column_int(statement, 15) != 0
+                let markerCount = Int(sqlite3_column_int(statement, 16))
+
+                var categories: [ContentCategory] = []
+                if let data = sqlite3_column_blob(statement, 10) {
+                    let length = sqlite3_column_bytes(statement, 10)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        categories = parsed.compactMap { ContentCategory(rawValue: $0) }
+                    }
+                }
+
+                var topics: [String] = []
+                if let data = sqlite3_column_blob(statement, 11) {
+                    let length = sqlite3_column_bytes(statement, 11)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        topics = parsed
+                    }
+                }
+
+                var guests: [String] = []
+                if let data = sqlite3_column_blob(statement, 12) {
+                    let length = sqlite3_column_bytes(statement, 12)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        guests = parsed
+                    }
+                }
+
+                var artists: [String] = []
+                if let data = sqlite3_column_blob(statement, 13) {
+                    let length = sqlite3_column_bytes(statement, 13)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        artists = parsed
+                    }
+                }
+
+                if let startTime = dateFormatter.date(from: startTimeString) {
+                    let endTime = endTimeString.flatMap { dateFormatter.date(from: $0) }
+                    let session = ListeningSession(
+                        id: id,
+                        contentId: contentId,
+                        contentType: contentType,
+                        providerId: providerId,
+                        title: title,
+                        source: source,
+                        startTime: startTime,
+                        endTime: endTime,
+                        duration: duration,
+                        progress: progress,
+                        categories: categories,
+                        topics: topics,
+                        guests: guests,
+                        artists: artists,
+                        notes: notes,
+                        isFavorited: isFavorited,
+                        markerCount: markerCount
+                    )
+                    sessions.append(session)
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        return sessions
+    }
+
+    func getListeningSessionsByCategory(_ category: ContentCategory, limit: Int = 50) -> [ListeningSession] {
+        var sessions: [ListeningSession] = []
+        let query = "SELECT id, content_id, content_type, provider_id, title, source, start_time, end_time, duration, progress, categories, topics, guests, artists, notes, is_favorited, marker_count FROM listening_sessions WHERE categories LIKE ? ORDER BY start_time DESC LIMIT ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            let categoryPattern = "%\(category.rawValue)%"
+            sqlite3_bind_text(statement, 1, categoryPattern, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int(statement, 2, Int32(limit))
+
+            let dateFormatter = ISO8601DateFormatter()
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(statement, 0))
+                let contentId = String(cString: sqlite3_column_text(statement, 1))
+                let contentTypeString = String(cString: sqlite3_column_text(statement, 2))
+                let contentType = ContentType(rawValue: contentTypeString) ?? .broadcast
+                let providerId = String(cString: sqlite3_column_text(statement, 3))
+                let title = String(cString: sqlite3_column_text(statement, 4))
+                let source = String(cString: sqlite3_column_text(statement, 5))
+                let startTimeString = String(cString: sqlite3_column_text(statement, 6))
+                let endTimeString = sqlite3_column_text(statement, 7).map { String(cString: $0) }
+                let duration = Int(sqlite3_column_int(statement, 8))
+                let progress = Int(sqlite3_column_int(statement, 9))
+                let notes = sqlite3_column_text(statement, 14).map { String(cString: $0) }
+                let isFavorited = sqlite3_column_int(statement, 15) != 0
+                let markerCount = Int(sqlite3_column_int(statement, 16))
+
+                var categories: [ContentCategory] = []
+                if let data = sqlite3_column_blob(statement, 10) {
+                    let length = sqlite3_column_bytes(statement, 10)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        categories = parsed.compactMap { ContentCategory(rawValue: $0) }
+                    }
+                }
+
+                var topics: [String] = []
+                if let data = sqlite3_column_blob(statement, 11) {
+                    let length = sqlite3_column_bytes(statement, 11)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        topics = parsed
+                    }
+                }
+
+                var guests: [String] = []
+                if let data = sqlite3_column_blob(statement, 12) {
+                    let length = sqlite3_column_bytes(statement, 12)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        guests = parsed
+                    }
+                }
+
+                var artists: [String] = []
+                if let data = sqlite3_column_blob(statement, 13) {
+                    let length = sqlite3_column_bytes(statement, 13)
+                    let nsData = NSData(bytes: data, length: Int(length))
+                    if let parsed = try? JSONSerialization.jsonObject(with: nsData as Data) as? [String] {
+                        artists = parsed
+                    }
+                }
+
+                if let startTime = dateFormatter.date(from: startTimeString) {
+                    let endTime = endTimeString.flatMap { dateFormatter.date(from: $0) }
+                    let session = ListeningSession(
+                        id: id,
+                        contentId: contentId,
+                        contentType: contentType,
+                        providerId: providerId,
+                        title: title,
+                        source: source,
+                        startTime: startTime,
+                        endTime: endTime,
+                        duration: duration,
+                        progress: progress,
+                        categories: categories,
+                        topics: topics,
+                        guests: guests,
+                        artists: artists,
+                        notes: notes,
+                        isFavorited: isFavorited,
+                        markerCount: markerCount
+                    )
+                    sessions.append(session)
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        return sessions
+    }
+
+    func addNoteToListeningSession(_ sessionId: String, note: String) -> Bool {
+        let query = "UPDATE listening_sessions SET notes = ? WHERE id = ?"
+
+        var statement: OpaquePointer?
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, note, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(statement, 2, sessionId, -1, SQLITE_TRANSIENT)
+
+            if sqlite3_step(statement) == SQLITE_DONE {
+                sqlite3_finalize(statement)
+                return true
+            }
+        }
+        sqlite3_finalize(statement)
+        return false
     }
 
     // MARK: - Deinit

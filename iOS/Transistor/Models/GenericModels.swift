@@ -178,6 +178,90 @@ enum PlaylistItemType: String, Codable {
     case podcast = "podcast"
 }
 
+// MARK: - Listening Session (for logging and history)
+struct ListeningSession: Identifiable, Codable {
+    let id: String
+    let contentId: String
+    let contentType: ContentType
+    let providerId: String
+    let title: String
+    let source: String
+    let startTime: Date
+    var endTime: Date?
+    let duration: Int // total duration in seconds
+    var progress: Int // in seconds
+    let categories: [ContentCategory]
+    let topics: [String]
+    let guests: [String]
+    let artists: [String]
+    var notes: String?
+    var isFavorited: Bool
+    let markerCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, source, duration, progress, categories, topics, guests, artists, notes
+        case contentId = "content_id"
+        case contentType = "content_type"
+        case providerId = "provider_id"
+        case startTime = "start_time"
+        case endTime = "end_time"
+        case isFavorited = "is_favorited"
+        case markerCount = "marker_count"
+    }
+
+    // Computed properties
+    var percentage: Int {
+        guard duration > 0 else { return 0 }
+        return Int((Double(progress) / Double(duration)) * 100)
+    }
+
+    var timeAgo: String {
+        let interval = Date().timeIntervalSince(startTime)
+        let minutes = Int(interval / 60)
+        let hours = minutes / 60
+        let days = hours / 24
+
+        if days > 0 {
+            return "\(days) day\(days > 1 ? "s" : "") ago"
+        } else if hours > 0 {
+            return "\(hours) hour\(hours > 1 ? "s" : "") ago"
+        } else if minutes > 0 {
+            return "\(minutes) minute\(minutes > 1 ? "s" : "") ago"
+        } else {
+            return "just now"
+        }
+    }
+}
+
+// MARK: - Content Category for Listening History
+enum ContentCategory: String, Codable, CaseIterable {
+    case news
+    case music
+    case interview
+    case sports
+    case education
+    case entertainment
+    case podcast
+    case documentary
+    case comedy
+    case other
+
+    var displayName: String {
+        switch self {
+        case .news: return "News"
+        case .music: return "Music"
+        case .interview: return "Interview"
+        case .sports: return "Sports"
+        case .education: return "Education"
+        case .entertainment: return "Entertainment"
+        case .podcast: return "Podcast"
+        case .documentary: return "Documentary"
+        case .comedy: return "Comedy"
+        case .other: return "Other"
+        }
+    }
+}
+
 // MARK: - Unified Search Result
 struct UnifiedSearchResult: Codable {
     let programs: [Program]
