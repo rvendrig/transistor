@@ -104,7 +104,157 @@ Bij het toevoegen van een nieuwe provider, documenteer de mapping bovenaan het p
 
 ## What To Work On Next
 
-1. **Vind een echte NPO data-bron** — de fake API is de grootste blocker
-2. **Verifieer audio stream URLs** — test of HLS URLs resolven
-3. **Verwijder legacy NPO views** — `NPOChannelsViewUpdated.swift` kan vervangen worden door `BrowseView`
-4. **Voeg een tweede provider toe** (BBC Sounds, Spotify) om het multi-provider model te valideren
+### Phase 1: Verification & Real Content (Priority: HIGH)
+
+**Goal**: Verify the app compiles, runs, and plays real content
+
+1. **Build & Test on macOS**
+   - `xcode build` the Transistor.xcodeproj to verify zero compilation errors
+   - Run on simulator to verify app launches without crashes
+   - Test tab navigation: Browse → Playlists → Log → Search → Settings
+   - Verify mini player appears when content plays
+
+2. **Real NPO Radio Streams**
+   - Current state: `NPOProvider.fetchBroadcasts()` returns broadcasts with `audioUrl` field
+   - `ContentEnrichmentService` injects real HLS URLs from `RealContentSeed.npoStreamUrls`
+   - **Test**: Pick a broadcast, verify it has a valid audioUrl, attempt playback
+   - **Expected**: Audio plays without buffering errors
+   - If URLs fail: NPO Radio streams are behind IP-block or require authentication
+
+3. **Listening Session Auto-Creation**
+   - Current: `AudioPlayerService.play()` calls `startSession()` which creates ListeningSession in DB
+   - `AudioPlayerService.currentSessionId` tracks the active session
+   - Progress updates via periodic time observer
+   - **Test**: Play content, check LogView, verify session appears with correct start time and progress
+   - **Expected**: Session auto-created, progress updates every 500ms, ends when playback stops
+
+### Phase 2: Completion & Polish (Priority: MEDIUM)
+
+4. **UI/UX Refinements**
+   - **BrowseView**: Test day navigation in schedule view, verify date picker works
+   - **LogView**: Verify date grouping ("Vandaag", "Gisteren", dates). Test marker display
+   - **SearchView**: Test search across shows/broadcasts/episodes, verify presenter display
+   - **Mini Player**: Verify LIVE indicator shows for live streams, artwork loads, play/pause works
+   - **Color scheme**: Verify dark theme is consistent across all tabs (use `Color.darkBg`, `Color.cardBg`, `Color.transistorGreen`)
+
+5. **Playlist Integration**
+   - PlaylistsView, PlaylistDetailView, AddToPlaylistView are created but may need:
+     - Verify "Add to Playlist" button works from SearchView, BrowseView detail screens
+     - Test creating new playlist with name/description
+     - Test adding items, verify item count updates
+     - Test removing items from playlist
+
+6. **Marker & Favorites**
+   - Verify markers can be created during playback (timestamp + tags)
+   - Verify favorites button works in detail views
+   - Test that both persist to SQLite and reload on app restart
+
+### Phase 3: Second Provider (Priority: MEDIUM)
+
+7. **Add BBC Sounds Provider**
+   - Create `BBCProvider: ContentProvider` in `Providers/BBCProvider.swift`
+   - Implement required methods: `fetchChannels()`, `fetchShows()`, `fetchBroadcasts()`
+   - BBC Sounds API: https://www.bbc.co.uk/sounds/api/bbc/live (or equivalent)
+   - Document mapping at top of file (see Provider Mapping Template below)
+   - Register in `TransistorApp.init()`: `ProviderStore.shared.registerProvider(BBCProvider())`
+   - **Test**: Toggle BBC provider on in Settings, verify BBC channels appear in BrowseView
+
+### Phase 4: Cleanup (Priority: LOW)
+
+8. **Remove Legacy Views**
+   - `NPOChannelsViewUpdated.swift` — functionality now in `BrowseView`
+   - `NPOItemDetailView.swift` — may be replaced by generic broadcast/episode detail
+   - `NPOViewModel.swift` — mostly deprecated, only used for legacy compatibility
+   - Check references in `TransistorApp.swift` before deleting
+
+9. **Documentation**
+   - Update this file with any architectural changes
+   - Document any new provider integrations (BBC, Spotify, etc.)
+   - Add troubleshooting section if compilation issues arise
+
+---
+
+## Step-by-Step Checklist for Next Agent
+
+### Start of Session
+- [ ] `git fetch origin && git checkout main` (or stay on feature branch if continuing work)
+- [ ] Verify HEAD is at commit 422acea (latest)
+- [ ] Open iOS/Transistor.xcodeproj in Xcode
+- [ ] Build & run on simulator
+
+### Phase 1 Testing
+- [ ] App launches, no crashes
+- [ ] Tab navigation works (Browse → Playlists → Log → Search → Settings)
+- [ ] BrowseView shows radio channels grid
+- [ ] Tap a channel, verify show list appears (or schedule with day navigation)
+- [ ] Search works: type "news", verify broadcasts appear
+- [ ] Play a broadcast: verify mini player appears, audio plays
+- [ ] Stop playback, check LogView: verify listening session exists with correct progress
+- [ ] Tap Settings, toggle provider on/off, verify UI updates
+
+### Phase 2 Refinements
+- [ ] Create a playlist from SearchView
+- [ ] Add a broadcast to playlist
+- [ ] Verify playlist appears in PlaylistsView
+- [ ] Create a marker during playback (if marker UI exists)
+- [ ] Favorite a broadcast
+- [ ] App restart, verify playlists/markers/favorites persist
+
+### Phase 3 New Provider
+- [ ] Create BBCProvider.swift with basic channel fetching
+- [ ] Register in TransistorApp
+- [ ] Toggle BBC on in Settings
+- [ ] Verify BBC channels appear in BrowseView
+
+### Before Committing
+- [ ] `git status` — verify only intended files changed
+- [ ] `swift build` or `xcodebuild` — zero warnings
+- [ ] Test on both light & dark theme
+- [ ] Commit with clear message: `git commit -m "Feature: description"`
+- [ ] Push: `git push -u origin claude/<description>-<suffix>`
+
+---
+
+## Known Limitations
+
+### Current Issues
+- **NPOAPIService** uses hardcoded test endpoints (nporadio.nl/api/v3 doesn't exist)
+- **HLS URLs** are injected via ContentEnrichmentService, may be blocked by IP/auth
+- **Podcast feeds** partially implemented, some RSS parsing may fail
+- **Schedule view** only shows one day at a time, no multi-day view
+
+### Future Work
+- Real NPO API integration (possibly via web scraping or official API)
+- BBC Sounds, Spotify, other radio networks
+- Transcript/text overlay for broadcasts
+- Push notifications for live broadcasts
+- Watch OS app
+- CarPlay support
+
+---
+
+## Debugging Tips
+
+**App won't build:**
+- Check Xcode build settings: iOS 15.0+ required, Swift 5.5+
+- Verify all imports: SwiftUI, AVFoundation, SQLite3
+
+**Audio won't play:**
+- Check AVAudioSession setup in AudioPlayerService.setupAudioSession()
+- Verify URL is valid: print(audioUrl) before playback
+- Check Audio Playback & Recording capability in Signing & Capabilities
+
+**UI looks wrong:**
+- Colors defined as extensions in TransistorApp: `Color.darkBg`, `Color.cardBg`, `Color.transistorGreen`
+- Dark theme forced in TransistorApp: `.preferredColorScheme(.dark)`
+- If colors missing: add extensions to Color
+
+**Listening session not created:**
+- Check `AudioPlayerService.startSession()` is called
+- Verify `DatabaseService.createListeningSession()` returns non-nil
+- Check SQLite database file exists at `~/Library/Documents/transistor.db`
+
+**Provider not showing:**
+- Verify provider registered in `TransistorApp.init()`
+- Verify `ProviderStore.shared.activeProviders` contains provider id
+- Check SettingsView toggles work correctly
