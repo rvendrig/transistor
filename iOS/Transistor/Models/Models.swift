@@ -38,11 +38,13 @@ struct NPOBroadcast: Identifiable, Codable {
     let duration: Int // in seconds
     let description: String?
     let image: String?
+    let audioUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, image, duration
         case programId = "program_id"
         case startTime = "start_time"
+        case audioUrl = "audio_url"
     }
 }
 

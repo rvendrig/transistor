@@ -101,10 +101,14 @@ class NPODataService {
 
     // MARK: - Broadcasts
 
-    func getBroadcastsForProgram(_ programId: String) -> [NPOBroadcast] {
+    func getBroadcastsForProgram(_ programId: String, channelId: String? = nil) -> [NPOBroadcast] {
         var broadcasts: [NPOBroadcast] = []
         let calendar = Calendar.current
         let now = Date()
+        let enrichmentService = ContentEnrichmentService.shared
+
+        // Get audio URL for channel (default to Radio 1)
+        let audioURL = channelId.map { enrichmentService.getNPOStreamURL(forChannel: $0) } ?? enrichmentService.getNPOStreamURL(forChannel: "radio1")
 
         // Create broadcasts for the last 10 days
         for daysAgo in 0..<10 {
@@ -116,7 +120,8 @@ class NPODataService {
                     startTime: date,
                     duration: 3600, // 1 hour
                     description: "Deze aflevering bevat interessante onderwerpen en gasten",
-                    image: nil
+                    image: nil,
+                    audioUrl: audioURL
                 )
                 broadcasts.append(broadcast)
             }
