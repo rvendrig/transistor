@@ -3,6 +3,8 @@ import SwiftUI
 struct NPOItemDetailView: View {
     let item: NPOItem
     let broadcast: NPOBroadcast
+    @StateObject private var viewModel = NPOViewModel()
+    @State private var showAddToPlaylist = false
 
     var body: some View {
         ScrollView {
@@ -117,6 +119,20 @@ struct NPOItemDetailView: View {
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
         .background(Color.darkBg)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showAddToPlaylist = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.transistorGreen)
+                }
+            }
+        }
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistView(viewModel: viewModel, playlistId: item.id, isPresented: $showAddToPlaylist)
+        }
+        .onAppear {
+            viewModel.loadPlaylists()
+        }
     }
 
     func itemTypeLabel(_ type: NPOItem.ItemType) -> String {
