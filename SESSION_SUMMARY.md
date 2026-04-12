@@ -175,15 +175,16 @@ This session implemented the **Prompt & Log Interface** feature and **Audio Play
 
 ---
 
-## App Structure (7 Tabs)
+## App Structure (6 Tabs)
 
 1. **Browse** - Channel and program navigation (NPOChannelsViewV2)
 2. **Guide** - Live broadcast schedule (ScheduleView)
 3. **Playlists** - User-created playlists (PlaylistsView)
-4. **History** - Listening sessions (ListeningLogView) ✨ NEW
-5. **Commands** - Voice commands (PromptInterface) ✨ NEW
-6. **Providers** - Provider management (ProvidersView)
-7. **Search** - Cross-provider search (SearchView)
+4. **Hub** - Listening history + Voice commands (ListeningHubView) ✨ COMBINED NEW
+   - History tab: Filter and sort listening sessions
+   - Commands tab: Voice prompts with suggestions
+5. **Providers** - Provider management (ProvidersView)
+6. **Search** - Cross-provider search (SearchView)
 
 ---
 
@@ -288,9 +289,9 @@ CREATE TABLE listening_sessions (
 - 1 bug fix commit
 - 5 feature commits
 
-**Files Created**: 12 new files
+**Files Created**: 13 new files (added ListeningHubView)
 **Files Modified**: 2 existing files
-**Total Changes**: 2,355+ lines added
+**Total Changes**: 2,782+ lines added
 
 ---
 
@@ -325,15 +326,16 @@ CREATE TABLE listening_sessions (
 | Metric | Value |
 |--------|-------|
 | Duration | ~2 hours |
-| Commits | 10 |
-| Files Created | 12 |
+| Commits | 11 |
+| Files Created | 13 |
 | Files Modified | 2 |
-| Lines of Code | 2,355+ |
+| Lines of Code | 2,782+ |
 | Features Implemented | 3 major features |
-| Tabs Added | 2 (History, Commands) |
+| Tabs Added | 1 (combined Hub) |
+| Tab Count Optimized | 7 → 6 tabs |
 | Database Tables | 1 (listening_sessions) |
 | Database Indices | 2 |
-| UI Components | 5 |
+| UI Components | 6 (including combined Hub) |
 | Services | 1 (AudioPlayerService) |
 
 ---
@@ -348,9 +350,11 @@ CREATE TABLE listening_sessions (
 
 📊 **Data**: Comprehensive listening session tracking with rich metadata
 
-🎨 **UI**: Beautiful, intuitive interface across 7 tabs
+🎨 **UI**: Beautiful, intuitive interface across 6 streamlined tabs with combined Listening Hub
 
 🔧 **Infrastructure**: Production-ready audio playback system
+
+🎯 **UX Optimization**: Combined History and Commands into single Hub tab for better navigation
 
 ---
 
