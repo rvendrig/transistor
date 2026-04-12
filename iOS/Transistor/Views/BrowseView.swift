@@ -181,6 +181,7 @@ struct BroadcastDetailView: View {
     let broadcast: Broadcast
     let channelId: String
 
+    @EnvironmentObject var audioPlayer: AudioPlayerService
     @State private var detail: NPOBroadcastDetail?
     @State private var tracks: [NPOTrackAPI] = []
     @State private var broadcastList: [NPOBroadcastListItem] = []
@@ -227,7 +228,7 @@ struct BroadcastDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Show-link (als beschikbaar)
                     if let programmeName = detail?.programmeName, let programmeUrl = detail?.programmeUrl {
-                        NavigationLink(destination: Text("Show: \(programmeName)")) {
+                        NavigationLink(destination: ShowPageView(channelId: channelId, programmeUrl: programmeUrl, programmeName: programmeName)) {
                             HStack(spacing: 4) {
                                 Text(programmeName)
                                     .font(.subheadline)
@@ -347,7 +348,17 @@ struct BroadcastDetailView: View {
     private var ctaButton: some View {
         switch broadcastState {
         case .live:
-            Button(action: { /* TODO: AudioPlayerService */ }) {
+            Button(action: {
+                if let streamUrl = broadcast.audioUrl {
+                    Task {
+                        await audioPlayer.playLive(
+                            url: streamUrl,
+                            title: broadcast.displayTitle,
+                            imageUrl: detail?.imageUrl ?? broadcast.image
+                        )
+                    }
+                }
+            }) {
                 HStack {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                     Text("Luister live")
@@ -362,7 +373,15 @@ struct BroadcastDetailView: View {
 
         case .past:
             if let listenBackUrl = detail?.listenBackUrl, !listenBackUrl.isEmpty {
-                Button(action: { /* TODO: AudioPlayerService met listenBackUrl */ }) {
+                Button(action: {
+                    Task {
+                        await audioPlayer.playOnDemand(
+                            url: listenBackUrl,
+                            title: broadcast.displayTitle,
+                            imageUrl: detail?.imageUrl ?? broadcast.image
+                        )
+                    }
+                }) {
                     HStack {
                         Image(systemName: "play.fill")
                         Text("Luister terug")
@@ -525,41 +544,47 @@ struct BroadcastDetailView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal)
 
-            ForEach(broadcastList.prefix(5), id: \.url) { item in
-                HStack(spacing: 12) {
-                    if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle().fill(Color.cardBg)
-                        }
-                        .frame(width: 50, height: 50)
-                        .cornerRadius(6)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-
-                        HStack(spacing: 8) {
-                            if let date = item.date {
-                                Text(date)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+            ForEach(broadcastList.prefix(8), id: \.url) { item in
+                NavigationLink(destination: BroadcastFromUrlView(channelId: channelId, broadcastUrl: item.url, title: item.title)) {
+                    HStack(spacing: 12) {
+                        if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle().fill(Color.cardBg)
                             }
-                            if let time = item.time {
-                                Text(time)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                            .frame(width: 50, height: 50)
+                            .cornerRadius(6)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+
+                            HStack(spacing: 8) {
+                                if let date = item.date {
+                                    Text(date)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                if let time = item.time {
+                                    Text(time)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
                             }
                         }
-                    }
 
-                    Spacer()
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
         }
         .padding(.top, 8)
@@ -633,7 +658,301 @@ struct BroadcastDetailView: View {
     }
 }
 
+// MARK: - Show pagina (programma met alle uitzendingen)
+
+struct ShowPageView: View {
+    let channelId: String
+    let programmeUrl: String
+    let programmeName: String
+
+    @State private var showPage: NPOShowPage?
+    @State private var isLoading = true
+
+    var body: some View {
+        ScrollView {
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView().tint(.transistorGreen)
+                    Text("Laden...")
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+            } else if let showPage {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header
+                    if let imageUrl = showPage.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle().fill(Color.cardBg)
+                        }
+                        .frame(height: 200)
+                        .clipped()
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                    }
+
+                    if let description = showPage.description, !description.isEmpty {
+                        Text(description)
+                            .font(.body)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                    }
+
+                    // Uitzendingen
+                    if !showPage.broadcasts.isEmpty {
+                        Text("Uitzendingen")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal)
+
+                        ForEach(showPage.broadcasts, id: \.url) { item in
+                            NavigationLink(destination: BroadcastFromUrlView(channelId: channelId, broadcastUrl: item.url, title: item.title)) {
+                                HStack(spacing: 12) {
+                                    if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable().aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Rectangle().fill(Color.cardBg)
+                                        }
+                                        .frame(width: 60, height: 60)
+                                        .cornerRadius(8)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.title)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+                                            .lineLimit(2)
+
+                                        HStack(spacing: 8) {
+                                            if let date = item.date {
+                                                Text(date)
+                                                    .font(.caption)
+                                                    .foregroundColor(.gray)
+                                            }
+                                            if let time = item.time {
+                                                Text(time)
+                                                    .font(.caption)
+                                                    .foregroundColor(.gray)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical)
+            } else {
+                Text("Kon programma niet laden")
+                    .foregroundColor(.gray)
+                    .padding()
+            }
+        }
+        .background(Color.darkBg)
+        .navigationTitle(programmeName)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            Task { await loadShowPage() }
+        }
+    }
+
+    private func loadShowPage() async {
+        isLoading = true
+        do {
+            showPage = try await NPOAPIService.shared.fetchShowPage(
+                forChannel: channelId,
+                programmeUrl: programmeUrl
+            )
+        } catch {
+            print("Error loading show page: \(error)")
+        }
+        isLoading = false
+    }
+}
+
+// MARK: - Broadcast laden via URL (voor "andere uitzendingen")
+
+struct BroadcastFromUrlView: View {
+    let channelId: String
+    let broadcastUrl: String
+    let title: String
+
+    @EnvironmentObject var audioPlayer: AudioPlayerService
+    @State private var detail: NPOBroadcastDetail?
+    @State private var isLoading = true
+
+    private let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    var body: some View {
+        ScrollView {
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView().tint(.transistorGreen)
+                    Text("Laden...")
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+            } else if let detail {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Afbeelding
+                    if let imageUrl = detail.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle().fill(Color.cardBg)
+                        }
+                        .frame(height: 220)
+                        .clipped()
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Show-link
+                        if let progName = detail.programmeName {
+                            HStack(spacing: 4) {
+                                Text(progName)
+                                    .font(.subheadline)
+                                    .foregroundColor(.transistorGreen)
+                            }
+                        }
+
+                        Text(detail.name)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+
+                        if !detail.presenters.isEmpty {
+                            Label(detail.presenters.joined(separator: ", "), systemImage: "person.2")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    // CTA
+                    if let listenBackUrl = detail.listenBackUrl, !listenBackUrl.isEmpty {
+                        Button(action: {
+                            Task {
+                                await audioPlayer.playOnDemand(
+                                    url: listenBackUrl,
+                                    title: detail.name,
+                                    imageUrl: detail.imageUrl
+                                )
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                Text("Luister terug")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.transistorGreen)
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    // Beschrijving
+                    if let description = detail.description, !description.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Over deze uitzending")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Text(description)
+                                .font(.body)
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    // Fragmenten
+                    if !detail.fragments.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Fragmenten")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.horizontal)
+
+                            ForEach(detail.fragments, id: \.id) { fragment in
+                                HStack(spacing: 12) {
+                                    if let imageUrl = fragment.imageUrl, let url = URL(string: imageUrl) {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable().aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Rectangle().fill(Color.cardBg)
+                                        }
+                                        .frame(width: 60, height: 60)
+                                        .cornerRadius(8)
+                                    }
+
+                                    Text(fragment.name)
+                                        .font(.subheadline)
+                                        .foregroundColor(.white)
+                                        .lineLimit(2)
+
+                                    Spacer()
+
+                                    Image(systemName: "play.circle")
+                                        .foregroundColor(.transistorGreen)
+                                        .font(.title3)
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+                .padding(.vertical)
+            } else {
+                Text("Kon uitzending niet laden")
+                    .foregroundColor(.gray)
+                    .padding()
+            }
+        }
+        .background(Color.darkBg)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            Task { await loadDetail() }
+        }
+    }
+
+    private func loadDetail() async {
+        isLoading = true
+        do {
+            detail = try await NPOAPIService.shared.fetchBroadcastDetail(
+                forChannel: channelId,
+                broadcastUrl: broadcastUrl
+            )
+        } catch {
+            print("Error loading broadcast from URL: \(error)")
+        }
+        isLoading = false
+    }
+}
+
 #Preview {
     BrowseView()
         .preferredColorScheme(.dark)
+        .environmentObject(AudioPlayerService.shared)
 }

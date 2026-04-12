@@ -31,15 +31,44 @@ class AudioPlayerService: NSObject, ObservableObject {
         }
     }
 
+    @Published var currentTitle: String?
+    @Published var currentImageUrl: String?
+    @Published var isLiveStream = false
+
     func play(content: AudioContent) async {
-        guard let urlString = content.audioUrl, let url = URL(string: urlString) else {
-            errorMessage = "Invalid audio URL"
+        guard let urlString = content.audioUrl else {
+            errorMessage = "Geen audio URL"
+            return
+        }
+        currentTitle = content.title
+        currentImageUrl = content.image
+        isLiveStream = false
+        await playURL(urlString)
+    }
+
+    func playLive(url: String, title: String, imageUrl: String? = nil) async {
+        currentTitle = title
+        currentImageUrl = imageUrl
+        isLiveStream = true
+        await playURL(url)
+    }
+
+    func playOnDemand(url: String, title: String, imageUrl: String? = nil) async {
+        currentTitle = title
+        currentImageUrl = imageUrl
+        isLiveStream = false
+        await playURL(url)
+    }
+
+    private func playURL(_ urlString: String) async {
+        guard let url = URL(string: urlString) else {
+            errorMessage = "Ongeldige audio URL"
             return
         }
 
-        currentContent = content
         isPlaying = false
         isBuffering = true
+        errorMessage = nil
 
         let asset = AVAsset(url: url)
         let playerItem = AVPlayerItem(asset: asset)
@@ -51,19 +80,18 @@ class AudioPlayerService: NSObject, ObservableObject {
             player?.replaceCurrentItem(with: playerItem)
         }
 
-        // Update duration when metadata loads
-        Task {
-            do {
-                let duration = try await asset.load(.duration)
-                self.duration = duration.seconds
-                self.isBuffering = false
-                self.player?.play()
-                self.isPlaying = true
-                errorMessage = nil
-            } catch {
-                errorMessage = "Failed to load audio: \(error.localizedDescription)"
-                isBuffering = false
-            }
+        do {
+            let dur = try await asset.load(.duration)
+            self.duration = dur.seconds.isNaN ? 0 : dur.seconds
+            self.isBuffering = false
+            self.player?.play()
+            self.isPlaying = true
+        } catch {
+            // Live streams often can't load duration — that's fine, just play
+            self.duration = 0
+            self.isBuffering = false
+            self.player?.play()
+            self.isPlaying = true
         }
     }
 

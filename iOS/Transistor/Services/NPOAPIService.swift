@@ -351,6 +351,76 @@ class NPOAPIService {
         }
     }
 
+    // MARK: - Fetch programme page (show level)
+
+    func fetchShowPage(forChannel channelId: String, programmeUrl: String) async throws -> NPOShowPage? {
+        guard let baseURL = Self.stationURLs[channelId] else {
+            throw NPOAPIError.invalidURL
+        }
+
+        guard let url = URL(string: "\(baseURL)\(programmeUrl)") else {
+            throw NPOAPIError.invalidURL
+        }
+
+        let (data, response) = try await session.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        return parseShowPage(html: html)
+    }
+
+    private func parseShowPage(html: String) -> NPOShowPage? {
+        guard let jsonRange = html.range(of: "\"application/json\""),
+              let scriptStart = html[jsonRange.upperBound...].range(of: ">"),
+              let scriptEnd = html[scriptStart.upperBound...].range(of: "</script>") else {
+            return nil
+        }
+
+        let jsonString = String(html[scriptStart.upperBound..<scriptEnd.lowerBound])
+
+        guard let jsonData = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let props = (json["props"] as? [String: Any])?["pageProps"] as? [String: Any] else {
+            return nil
+        }
+
+        let prog = props["programme"] as? [String: Any]
+        let description = (prog?["description"] as? String)?
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let imageUrl = prog?["imageUrl"] as? String
+        let name = props["pageHeaderTitle"] as? String ?? prog?["name"] as? String ?? ""
+
+        var broadcasts: [NPOBroadcastListItem] = []
+        if let bs = props["broadcastsSection"] as? [String: Any],
+           let bcs = bs["broadcasts"] as? [[String: Any]] {
+            for b in bcs {
+                if let title = b["title"] as? String, let url = b["url"] as? String {
+                    broadcasts.append(NPOBroadcastListItem(
+                        title: title,
+                        url: url,
+                        time: b["formattedTimes"] as? String,
+                        date: b["formattedDate"] as? String,
+                        imageUrl: b["imageUrl"] as? String
+                    ))
+                }
+            }
+        }
+
+        return NPOShowPage(
+            name: name,
+            description: description,
+            imageUrl: imageUrl,
+            broadcasts: broadcasts
+        )
+    }
+
     func fetchAllPrograms() async throws -> [NPOProgram] {
         var allPrograms: [NPOProgram] = []
 
@@ -427,6 +497,15 @@ struct NPOBroadcastListItem {
     let time: String?
     let date: String?
     let imageUrl: String?
+}
+
+// MARK: - Show Page (scraped from programma pages)
+
+struct NPOShowPage {
+    let name: String
+    let description: String?
+    let imageUrl: String?
+    let broadcasts: [NPOBroadcastListItem]
 }
 
 // MARK: - Error Handling
