@@ -58,6 +58,17 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="npo"
+        options={{
+          title: 'NPO',
+          tabBarLabel: 'NPO',
+          headerTitle: 'NPO Programma\'s',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="radio-tower" size={24} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
