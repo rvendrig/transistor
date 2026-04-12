@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct TransistorApp: App {
+    @StateObject private var viewModel = ContentViewModel()
+
     var body: some Scene {
         WindowGroup {
             TabView {
@@ -21,6 +23,18 @@ struct TransistorApp: App {
                 PlaylistsView()
                     .tabItem {
                         Label("Playlists", systemImage: "list.bullet")
+                    }
+
+                // Listening Log
+                ListeningLogView(viewModel: viewModel)
+                    .tabItem {
+                        Label("History", systemImage: "clock.fill")
+                    }
+
+                // Voice Commands
+                PromptInterface(viewModel: viewModel)
+                    .tabItem {
+                        Label("Commands", systemImage: "waveform.circle")
                     }
 
                 // Providers
