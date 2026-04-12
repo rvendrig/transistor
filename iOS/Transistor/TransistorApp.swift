@@ -25,16 +25,10 @@ struct TransistorApp: App {
                         Label("Playlists", systemImage: "list.bullet")
                     }
 
-                // Listening Log
-                ListeningLogView(viewModel: viewModel)
+                // Listening Hub (History + Commands)
+                ListeningHubView(viewModel: viewModel)
                     .tabItem {
-                        Label("History", systemImage: "clock.fill")
-                    }
-
-                // Voice Commands
-                PromptInterface(viewModel: viewModel)
-                    .tabItem {
-                        Label("Commands", systemImage: "waveform.circle")
+                        Label("Hub", systemImage: "sparkles")
                     }
 
                 // Providers
