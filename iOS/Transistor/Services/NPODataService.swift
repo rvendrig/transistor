@@ -10,37 +10,43 @@ class NPODataService {
             NPOChannel(
                 id: "radio1",
                 name: "NPO Radio 1",
-                description: "Nieuws, sport, cultuur en entertainment",
+                description: "Nieuws, sport en achtergronden",
                 logoURL: nil
             ),
             NPOChannel(
                 id: "radio2",
                 name: "NPO Radio 2",
-                description: "Muziek, entertainment en informatieve programma's",
+                description: "Het beste van popmuziek",
                 logoURL: nil
             ),
             NPOChannel(
                 id: "3fm",
                 name: "NPO 3FM",
-                description: "Muziek, hits en alternatieve nummers",
+                description: "De nieuwste muziek",
                 logoURL: nil
             ),
             NPOChannel(
                 id: "radio4",
-                name: "NPO Radio 4",
-                description: "Klassieke muziek en jazz",
+                name: "NPO Klassiek",
+                description: "Klassieke muziek",
                 logoURL: nil
             ),
             NPOChannel(
                 id: "radio5",
                 name: "NPO Radio 5",
-                description: "Documentaires en reportages",
+                description: "Muziek uit de jaren 60, 70 en 80",
                 logoURL: nil
             ),
             NPOChannel(
-                id: "radio6",
-                name: "NPO Radio 6",
-                description: "Muziek en verhalen",
+                id: "funx",
+                name: "FunX",
+                description: "Urban, hiphop, R&B en dance",
+                logoURL: nil
+            ),
+            NPOChannel(
+                id: "soulnjazz",
+                name: "NPO Soul & Jazz",
+                description: "Soul, jazz en funk",
                 logoURL: nil
             )
         ]

@@ -75,7 +75,36 @@ class NPOProvider: ContentProvider {
         }
     }
 
-    // MARK: - Broadcasts Fetching
+    // MARK: - Broadcasts by Channel (dagprogramma)
+    func fetchBroadcasts(forChannel channelId: String) async throws -> [Broadcast] {
+        let apiBroadcasts = try await apiService.fetchBroadcasts(forChannel: channelId)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+
+        return apiBroadcasts.compactMap { api in
+            guard let startTime = dateFormatter.date(from: api.startdatetime) else { return nil }
+            let endTime = dateFormatter.date(from: api.stopdatetime) ?? startTime
+            let duration = Int(endTime.timeIntervalSince(startTime))
+
+            return Broadcast(
+                id: "\(channelId)-\(api.startdatetime)",
+                providerId: id,
+                title: api.title,
+                showId: nil,
+                channelId: channelId,
+                seasonId: nil,
+                startTime: startTime,
+                duration: duration,
+                description: api.presenters,
+                image: api.image_url_400x400 ?? api.image_url,
+                audioUrl: NPOAPIService.streamURLs[channelId],
+                titleOverride: nil
+            )
+        }.sorted { $0.startTime < $1.startTime }
+    }
+
+    // MARK: - Broadcasts by Show
     func fetchBroadcasts(forShow showId: String) async throws -> [Broadcast] {
         do {
             // Try to fetch from API first
@@ -123,22 +152,10 @@ class NPOProvider: ContentProvider {
 
     // MARK: - Audio URL Helpers
 
-    /// Get audio URL for an NPO broadcast
-    func getAudioURL(channelId: String) -> String {
-        return "https://www.nporadio.nl/live/\(channelId)/index.m3u8"
-    }
-
-    /// Get NPO channel audio stream URL
+    /// Get live audio stream URL for a channel
     func getStreamURL(forChannel channelId: String) -> String {
-        let streamMapping: [String: String] = [
-            "radio1": "https://www.nporadio.nl/live/npo-radio-1/index.m3u8",
-            "radio2": "https://www.nporadio.nl/live/npo-radio-2/index.m3u8",
-            "3fm": "https://www.nporadio.nl/live/npo-3fm/index.m3u8",
-            "radio4": "https://www.nporadio.nl/live/npo-radio-4/index.m3u8",
-            "radio5": "https://www.nporadio.nl/live/npo-radio-5/index.m3u8",
-            "radio6": "https://www.nporadio.nl/live/npo-radio-6/index.m3u8"
-        ]
-        return streamMapping[channelId] ?? "https://www.nporadio.nl/live/npo-radio-1/index.m3u8"
+        return NPOAPIService.streamURLs[channelId]
+            ?? "https://icecast.omroep.nl/radio1-bb-mp3"
     }
 
     /// Enhance NPO broadcasts with audio URLs
@@ -161,14 +178,10 @@ class NPOProvider: ContentProvider {
 
     /// Discover real NPO content channels and their stream URLs
     func getRealContent() -> [(channel: String, url: String)] {
-        return [
-            ("NPO Radio 1", "https://www.nporadio.nl/live/npo-radio-1/index.m3u8"),
-            ("NPO Radio 2", "https://www.nporadio.nl/live/npo-radio-2/index.m3u8"),
-            ("NPO 3FM", "https://www.nporadio.nl/live/npo-3fm/index.m3u8"),
-            ("NPO Radio 4", "https://www.nporadio.nl/live/npo-radio-4/index.m3u8"),
-            ("NPO Radio 5", "https://www.nporadio.nl/live/npo-radio-5/index.m3u8"),
-            ("NPO Radio 6", "https://www.nporadio.nl/live/npo-radio-6/index.m3u8")
-        ]
+        NPOAPIService.streamURLs.map { (key, value) in
+            let name = NPODataService.shared.getAllChannels().first { $0.id == key }?.name ?? key
+            return (name, value)
+        }
     }
 
     // MARK: - Search

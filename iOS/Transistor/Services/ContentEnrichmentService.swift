@@ -7,11 +7,6 @@ class ContentEnrichmentService {
 
     // MARK: - NPO Audio URL Generation (delegating to NPOProvider)
 
-    /// Get audio URL for an NPO broadcast — delegates to NPOProvider
-    func getNPOAudioURL(channelId: String) -> String {
-        return NPOProvider().getAudioURL(channelId: channelId)
-    }
-
     /// Get NPO channel audio stream URL — delegates to NPOProvider
     func getNPOStreamURL(forChannel channelId: String) -> String {
         return NPOProvider().getStreamURL(forChannel: channelId)

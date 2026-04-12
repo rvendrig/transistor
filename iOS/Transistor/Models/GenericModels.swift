@@ -53,7 +53,9 @@ struct Network: Identifiable, Codable, Titled {
 
 // MARK: - Channel (zender/station binnen een network)
 
-struct Channel: Identifiable, Codable, Titled {
+struct Channel: Identifiable, Codable, Titled, Hashable {
+    static func == (lhs: Channel, rhs: Channel) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
     let id: String
     let providerId: String
     let networkId: String
@@ -75,7 +77,9 @@ struct Channel: Identifiable, Codable, Titled {
 
 // MARK: - Show (programma/podcast — onafhankelijk van channel)
 
-struct Show: Identifiable, Codable, Titled {
+struct Show: Identifiable, Codable, Titled, Hashable {
+    static func == (lhs: Show, rhs: Show) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
     let id: String
     let providerId: String
     let titles: [TitledPeriod]
@@ -122,7 +126,9 @@ struct Season: Identifiable, Codable, Titled {
 
 // MARK: - Broadcast (uitzending = show + channel + tijdstip)
 
-struct Broadcast: Identifiable, Codable, AudioContent {
+struct Broadcast: Identifiable, Codable, AudioContent, Hashable {
+    static func == (lhs: Broadcast, rhs: Broadcast) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
     let id: String
     let providerId: String
     let title: String

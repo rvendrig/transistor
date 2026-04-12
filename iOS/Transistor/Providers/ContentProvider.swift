@@ -13,6 +13,7 @@ protocol ContentProvider {
     func fetchShows(forChannel channelId: String) async throws -> [Show]
     func fetchSeasons(forShow showId: String) async throws -> [Season]
     func fetchBroadcasts(forShow showId: String) async throws -> [Broadcast]
+    func fetchBroadcasts(forChannel channelId: String) async throws -> [Broadcast]
     func fetchSegments(forBroadcast broadcastId: String) async throws -> [Segment]
     func search(_ query: String) async throws -> [any AudioContent]
 }
@@ -21,6 +22,7 @@ protocol ContentProvider {
 extension ContentProvider {
     func fetchNetworks() async throws -> [Network] { [] }
     func fetchSeasons(forShow showId: String) async throws -> [Season] { [] }
+    func fetchBroadcasts(forChannel channelId: String) async throws -> [Broadcast] { [] }
     func fetchSegments(forBroadcast broadcastId: String) async throws -> [Segment] { [] }
 }
 
