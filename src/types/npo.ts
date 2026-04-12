@@ -40,6 +40,22 @@ export interface NPOMusic {
   timestamp: number;
 }
 
+export interface NPOItem {
+  id: string;
+  broadcastId: string;
+  title: string;
+  description?: string;
+  type: 'interview' | 'music' | 'news' | 'report' | 'segment' | 'topic';
+  startTime: number; // seconds from start of broadcast
+  duration: number; // seconds
+  guests?: string[];
+  topics?: string[];
+  artist?: string; // for music items
+  musicTitle?: string; // for music items
+  imageUrl?: string;
+  teaserText?: string;
+}
+
 export interface NPOBroadcast {
   id: string;
   programId: string;

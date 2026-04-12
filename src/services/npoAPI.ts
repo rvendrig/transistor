@@ -8,6 +8,7 @@ import {
   NPOPresenter,
   NPOGuest,
   NPOMusic,
+  NPOItem,
 } from '@/types/npo';
 
 const NPO_API_BASE = 'https://www.nporadio.nl/api/v3';
@@ -137,6 +138,17 @@ export async function getNPOChannelSchedule(channelId: string): Promise<NPOSched
     return schedule;
   } catch (error) {
     console.error('Error fetching channel schedule:', error);
+    throw error;
+  }
+}
+
+// Fetch items (segments) for a broadcast
+export async function getNPOBroadcastItems(broadcastId: string): Promise<NPOItem[]> {
+  try {
+    const items = getMockBroadcastItems(broadcastId);
+    return items;
+  } catch (error) {
+    console.error('Error fetching broadcast items:', error);
     throw error;
   }
 }
@@ -502,4 +514,81 @@ function getNPOBroadcaster(channelId: string): NPOBroadcaster {
   };
 
   return broadcasters[channelId] || broadcasters.radio1;
+}
+
+function getMockBroadcastItems(broadcastId: string): NPOItem[] {
+  const items: NPOItem[] = [];
+
+  // Interview segment
+  items.push({
+    id: `item-${broadcastId}-1`,
+    broadcastId,
+    title: 'Interview met gast',
+    description: 'Een diepgaand interview over het actuele onderwerp',
+    type: 'interview',
+    startTime: 300, // 5 minutes in
+    duration: 900, // 15 minutes
+    guests: ['Expert in het veld'],
+    topics: ['actueel', 'diepgang'],
+    imageUrl: 'https://via.placeholder.com/300x300?text=Interview',
+    teaserText: 'Hoe kijkt deze expert aan tegen het onderwerp?',
+  });
+
+  // Music segment
+  items.push({
+    id: `item-${broadcastId}-2`,
+    broadcastId,
+    title: 'Muziek: Populaire nummers',
+    description: 'Een selectie van de best draaiende nummers',
+    type: 'music',
+    startTime: 1200, // 20 minutes in
+    duration: 600, // 10 minutes
+    artist: 'Diverse artiesten',
+    musicTitle: 'Hit nummers mix',
+    imageUrl: 'https://via.placeholder.com/300x300?text=Muziek',
+  });
+
+  // News segment
+  items.push({
+    id: `item-${broadcastId}-3`,
+    broadcastId,
+    title: 'Actueel: Belangrijk nieuws',
+    description: 'De belangrijkste nieuwsitems van het moment',
+    type: 'news',
+    startTime: 1800, // 30 minutes in
+    duration: 480, // 8 minutes
+    topics: ['nieuws', 'actueel'],
+    imageUrl: 'https://via.placeholder.com/300x300?text=Nieuws',
+    teaserText: 'Wat is er vandag belangrijk gebeurd?',
+  });
+
+  // Report segment
+  items.push({
+    id: `item-${broadcastId}-4`,
+    broadcastId,
+    title: 'Reportage: Dit moet je weten',
+    description: 'Een diepgaande reportage over een interessant onderwerp',
+    type: 'report',
+    startTime: 2280, // 38 minutes in
+    duration: 720, // 12 minutes
+    topics: ['onderzoek', 'reportage', 'samenleving'],
+    imageUrl: 'https://via.placeholder.com/300x300?text=Reportage',
+    teaserText: 'Wat gebeurt er achter de schermen?',
+  });
+
+  // Topic segment
+  items.push({
+    id: `item-${broadcastId}-5`,
+    broadcastId,
+    title: 'Thema: Vandaag in focus',
+    description: 'Het thema van vandaag en waarom het belangrijk is',
+    type: 'topic',
+    startTime: 3000, // 50 minutes in
+    duration: 600, // 10 minutes
+    topics: ['thema', 'focus'],
+    guests: ['Meerdere sprekers'],
+    imageUrl: 'https://via.placeholder.com/300x300?text=Thema',
+  });
+
+  return items;
 }

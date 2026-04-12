@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { NPOProgram, NPOBroadcast, NPOChannel } from '@/types/npo';
+import { NPOProgram, NPOBroadcast, NPOChannel, NPOItem } from '@/types/npo';
 import * as npoAPI from '@/services/npoAPI';
 import * as npoDb from '@/services/npoDatabase';
 
@@ -10,6 +10,7 @@ interface NPOState {
   broadcasts: NPOBroadcast[];
   currentProgram: NPOProgram | null;
   currentBroadcasts: NPOBroadcast[];
+  currentItems: NPOItem[];
   favorites: NPOBroadcast[];
   selectedChannel: string | null;
 
@@ -29,6 +30,7 @@ interface NPOState {
   loadPrograms: (channelId: string) => Promise<void>;
   selectProgram: (program: NPOProgram) => Promise<void>;
   refreshBroadcasts: (programId: string) => Promise<void>;
+  loadBroadcastItems: (broadcastId: string) => Promise<void>;
   searchBroadcasts: (query: string) => Promise<void>;
   loadFavorites: () => Promise<void>;
   addFavorite: (broadcast: NPOBroadcast) => Promise<void>;
@@ -45,6 +47,7 @@ export const useNPOStore = create<NPOState>((set, get) => ({
   broadcasts: [],
   currentProgram: null,
   currentBroadcasts: [],
+  currentItems: [],
   favorites: [],
   selectedChannel: null,
   isLoading: false,
@@ -156,6 +159,29 @@ export const useNPOStore = create<NPOState>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to refresh broadcasts';
       set({ error: errorMessage, isFetching: false });
+      throw error;
+    }
+  },
+
+  loadBroadcastItems: async (broadcastId: string) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      // Load items from database
+      let items = await npoDb.getItemsByBroadcast(broadcastId);
+
+      // If empty, fetch from API
+      if (items.length === 0) {
+        items = await npoAPI.getNPOBroadcastItems(broadcastId);
+        for (const item of items) {
+          await npoDb.saveItem(item);
+        }
+      }
+
+      set({ currentItems: items, isLoading: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load items';
+      set({ error: errorMessage, isLoading: false });
       throw error;
     }
   },

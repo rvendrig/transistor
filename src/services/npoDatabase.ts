@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { NPOProgram, NPOBroadcast, NPOChannel } from '@/types/npo';
+import { NPOProgram, NPOBroadcast, NPOChannel, NPOItem } from '@/types/npo';
 import { v4 as uuidv4 } from 'uuid';
 
 let db: any = null;
@@ -55,9 +55,28 @@ export async function initNPODatabase() {
         FOREIGN KEY (broadcastId) REFERENCES npo_broadcasts(id)
       );
 
+      CREATE TABLE IF NOT EXISTS npo_items (
+        id TEXT PRIMARY KEY,
+        broadcastId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL,
+        startTime INTEGER NOT NULL,
+        duration INTEGER NOT NULL,
+        guests TEXT,
+        topics TEXT,
+        artist TEXT,
+        musicTitle TEXT,
+        imageUrl TEXT,
+        teaserText TEXT,
+        FOREIGN KEY (broadcastId) REFERENCES npo_broadcasts(id)
+      );
+
       CREATE INDEX IF NOT EXISTS idx_npo_programs_channelId ON npo_programs(channelId);
       CREATE INDEX IF NOT EXISTS idx_npo_broadcasts_programId ON npo_broadcasts(programId);
       CREATE INDEX IF NOT EXISTS idx_npo_broadcasts_startTime ON npo_broadcasts(startTime);
+      CREATE INDEX IF NOT EXISTS idx_npo_items_broadcastId ON npo_items(broadcastId);
+      CREATE INDEX IF NOT EXISTS idx_npo_items_type ON npo_items(type);
     `);
     console.log('NPO database initialized successfully');
   } catch (error) {
@@ -268,7 +287,96 @@ export async function isFavorite(broadcastId: string): Promise<boolean> {
   }
 }
 
+// Item operations
+export async function saveItem(item: NPOItem): Promise<void> {
+  try {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO npo_items
+       (id, broadcastId, title, description, type, startTime, duration, guests, topics, artist, musicTitle, imageUrl, teaserText)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        item.id,
+        item.broadcastId,
+        item.title,
+        item.description || null,
+        item.type,
+        item.startTime,
+        item.duration,
+        item.guests ? JSON.stringify(item.guests) : null,
+        item.topics ? JSON.stringify(item.topics) : null,
+        item.artist || null,
+        item.musicTitle || null,
+        item.imageUrl || null,
+        item.teaserText || null,
+      ]
+    );
+  } catch (error) {
+    console.error('Error saving item:', error);
+    throw error;
+  }
+}
+
+export async function getItemsByBroadcast(broadcastId: string): Promise<NPOItem[]> {
+  try {
+    const results = await db.getAllAsync(
+      'SELECT * FROM npo_items WHERE broadcastId = ? ORDER BY startTime',
+      [broadcastId]
+    );
+    return results.map(dbRowToItem);
+  } catch (error) {
+    console.error('Error getting items:', error);
+    throw error;
+  }
+}
+
+export async function getItemsByType(type: string, limit: number = 50): Promise<NPOItem[]> {
+  try {
+    const results = await db.getAllAsync(
+      'SELECT * FROM npo_items WHERE type = ? ORDER BY startTime DESC LIMIT ?',
+      [type, limit]
+    );
+    return results.map(dbRowToItem);
+  } catch (error) {
+    console.error('Error getting items by type:', error);
+    throw error;
+  }
+}
+
+export async function searchItems(query: string): Promise<NPOItem[]> {
+  try {
+    const searchTerm = `%${query}%`;
+    const results = await db.getAllAsync(
+      `SELECT * FROM npo_items
+       WHERE title LIKE ? OR description LIKE ? OR artist LIKE ? OR musicTitle LIKE ?
+       ORDER BY startTime DESC`,
+      [searchTerm, searchTerm, searchTerm, searchTerm]
+    );
+    return results.map(dbRowToItem);
+  } catch (error) {
+    console.error('Error searching items:', error);
+    throw error;
+  }
+}
+
 // Helper functions
+function dbRowToItem(row: any): NPOItem {
+  return {
+    id: row.id,
+    broadcastId: row.broadcastId,
+    title: row.title,
+    description: row.description,
+    type: row.type,
+    startTime: row.startTime,
+    duration: row.duration,
+    guests: row.guests ? JSON.parse(row.guests) : undefined,
+    topics: row.topics ? JSON.parse(row.topics) : undefined,
+    artist: row.artist,
+    musicTitle: row.musicTitle,
+    imageUrl: row.imageUrl,
+    teaserText: row.teaserText,
+  };
+}
+
 function dbRowToProgram(row: any): NPOProgram {
   return {
     id: row.id,

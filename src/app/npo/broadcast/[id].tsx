@@ -175,6 +175,34 @@ export default function NPOBroadcastScreen() {
           </Pressable>
         </View>
 
+        {/* Items section */}
+        <Pressable
+          onPress={() => router.push(`/npo/broadcast-items/${broadcast.id}`)}
+          style={{
+            backgroundColor: '#1f1f1f',
+            padding: 15,
+            borderRadius: 8,
+            marginBottom: 20,
+            borderWidth: 1,
+            borderColor: '#333',
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#1DB954', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>
+                ONDERDELEN VAN DE UITZENDING
+              </Text>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
+                Bekijk alle segmenten
+              </Text>
+              <Text style={{ color: '#888', fontSize: 12, marginTop: 4 }}>
+                Interviews, muziek, nieuws en reportages
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#1DB954" />
+          </View>
+        </Pressable>
+
         {/* Description */}
         {broadcast.description && (
           <View style={{ marginBottom: 25 }}>
