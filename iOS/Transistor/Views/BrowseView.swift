@@ -1023,6 +1023,12 @@ struct BroadcastFromUrlView: View {
                             .fontWeight(.bold)
                             .foregroundColor(.white)
 
+                        if let formattedDate = detail.formattedDate {
+                            Label(formattedDate, systemImage: "clock")
+                                .font(.subheadline)
+                                .foregroundColor(.transistorGreen)
+                        }
+
                         if !detail.presenters.isEmpty {
                             Label(detail.presenters.joined(separator: ", "), systemImage: "person.2")
                                 .font(.subheadline)

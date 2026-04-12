@@ -275,6 +275,7 @@ class NPOAPIService {
         let programmeName = prog?["name"] as? String
         let programmeUrl = prog?["url"] as? String
         let recording = prog?["recording"] as? Bool ?? false
+        let formattedDate = rb["formattedDate"] as? String
 
         // Extract listen-back MP3 URL from showAssets
         var listenBackUrl: String?
@@ -311,6 +312,7 @@ class NPOAPIService {
         return NPOBroadcastDetail(
             name: name ?? "",
             description: cleanDescription,
+            formattedDate: formattedDate,
             presenters: presenters,
             imageUrl: imageUrl,
             programmeName: programmeName,
@@ -474,6 +476,7 @@ struct NPOTrackAPI: Codable {
 struct NPOBroadcastDetail {
     let name: String
     let description: String?
+    let formattedDate: String?
     let presenters: [String]
     let imageUrl: String?
     let programmeName: String?

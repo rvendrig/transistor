@@ -1,4 +1,11 @@
 name: Transistor
+schemes:
+  Transistor:
+    build:
+      targets:
+        Transistor: all
+    run:
+      config: Debug
 options:
   bundleIdPrefix: nl.rvendrig
   deploymentTarget:
