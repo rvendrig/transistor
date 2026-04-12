@@ -10,6 +10,11 @@ struct TransistorApp: App {
                         Label("NPO", systemImage: "radio.fill")
                     }
 
+                PlaylistsView()
+                    .tabItem {
+                        Label("Playlists", systemImage: "list.bullet")
+                    }
+
                 DiscoverView()
                     .tabItem {
                         Label("Discover", systemImage: "sparkles")
