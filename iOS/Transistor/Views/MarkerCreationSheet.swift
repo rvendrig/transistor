@@ -120,10 +120,9 @@ struct MarkerCreationSheet: View {
 }
 
 #Preview {
-    @State var isPresented = true
-    let viewModel = ContentViewModel()
-    return MarkerCreationSheet(
-        viewModel: viewModel,
+    @Previewable @State var isPresented = true
+    MarkerCreationSheet(
+        viewModel: ContentViewModel(),
         contentId: "test-id",
         contentType: .broadcast,
         providerId: "npo",

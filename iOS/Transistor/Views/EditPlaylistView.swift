@@ -65,14 +65,16 @@ struct EditPlaylistView: View {
 }
 
 #Preview {
-    @State var isPresented = true
-    let viewModel = ContentViewModel()
-    let playlist = Playlist(
-        id: "1",
-        name: "My Playlist",
-        description: "A test playlist",
-        createdAt: Date(),
-        itemCount: 5
+    @Previewable @State var isPresented = true
+    EditPlaylistView(
+        viewModel: ContentViewModel(),
+        playlist: Playlist(
+            id: "1",
+            name: "My Playlist",
+            description: "A test playlist",
+            createdAt: Date(),
+            itemCount: 5
+        ),
+        isPresented: $isPresented
     )
-    return EditPlaylistView(viewModel: viewModel, playlist: playlist, isPresented: $isPresented)
 }

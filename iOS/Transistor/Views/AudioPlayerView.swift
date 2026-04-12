@@ -3,7 +3,7 @@ import SwiftUI
 struct AudioPlayerView: View {
     @StateObject var audioPlayer = AudioPlayerService.shared
     @State private var showingPlayer = false
-    let content: AudioContent?
+    let content: (any AudioContent)?
 
     var body: some View {
         VStack(spacing: 12) {

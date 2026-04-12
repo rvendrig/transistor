@@ -63,7 +63,6 @@ struct CreatePlaylistView: View {
 }
 
 #Preview {
-    @State var isPresented = true
-    let viewModel = ContentViewModel()
-    return CreatePlaylistView(viewModel: viewModel, isPresented: $isPresented)
+    @Previewable @State var isPresented = true
+    CreatePlaylistView(viewModel: ContentViewModel(), isPresented: $isPresented)
 }

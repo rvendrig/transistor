@@ -31,7 +31,7 @@ class NPOViewModel: ObservableObject {
             programs = try await apiService.fetchPrograms(forChannel: channelId)
 
             // Save to database
-            for program in programs {
+            for _ in programs {
                 // Save program logic here if needed
             }
         } catch {

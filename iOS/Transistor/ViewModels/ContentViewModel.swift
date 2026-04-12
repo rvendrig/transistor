@@ -137,7 +137,7 @@ class ContentViewModel: ObservableObject {
         isSearching = true
         errorMessage = nil
 
-        var allShows: [Show] = []
+        let allShows: [Show] = []
         var allBroadcasts: [Broadcast] = []
         var allEpisodes: [Episode] = []
 
@@ -148,9 +148,7 @@ class ContentViewModel: ObservableObject {
                 let results = try await provider.search(query)
 
                 for result in results {
-                    if let show = result as? Show {
-                        allShows.append(show)
-                    } else if let broadcast = result as? Broadcast {
+                    if let broadcast = result as? Broadcast {
                         allBroadcasts.append(broadcast)
                     } else if let episode = result as? Episode {
                         allEpisodes.append(episode)

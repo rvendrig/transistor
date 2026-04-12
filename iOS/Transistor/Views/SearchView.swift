@@ -14,12 +14,12 @@ struct SearchView: View {
                             .foregroundColor(.gray)
                         TextField("Search shows, broadcasts...", text: $searchText)
                             .textFieldStyle(.roundedBorder)
-                            .onChange(of: searchText) { newValue in
+                            .onChange(of: searchText) {
                                 searchTask?.cancel()
                                 searchTask = Task {
                                     try? await Task.sleep(nanoseconds: 300_000_000)
                                     guard !Task.isCancelled else { return }
-                                    await viewModel.search(newValue)
+                                    await viewModel.search(searchText)
                                 }
                             }
                     }

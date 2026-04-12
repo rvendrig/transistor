@@ -10,7 +10,7 @@ class AudioPlayerService: NSObject, ObservableObject {
     @Published var duration: Double = 0
     @Published var isBuffering = false
     @Published var errorMessage: String?
-    @Published var currentContent: AudioContent?
+    @Published var currentContent: (any AudioContent)?
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -39,7 +39,7 @@ class AudioPlayerService: NSObject, ObservableObject {
     private let dbService = DatabaseService.shared
     private var currentSessionId: String?
 
-    func play(content: AudioContent) async {
+    func play(content: any AudioContent) async {
         guard let urlString = content.audioUrl else {
             errorMessage = "Geen audio URL"
             return
@@ -106,7 +106,7 @@ class AudioPlayerService: NSObject, ObservableObject {
         isBuffering = true
         errorMessage = nil
 
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         let playerItem = AVPlayerItem(asset: asset)
 
         if player == nil {
@@ -164,8 +164,10 @@ class AudioPlayerService: NSObject, ObservableObject {
 
     private func addPeriodicTimeObserver() {
         let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            self?.currentTime = time.seconds
+        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { @Sendable [weak self] time in
+            Task { @MainActor in
+                self?.currentTime = time.seconds
+            }
         }
     }
 

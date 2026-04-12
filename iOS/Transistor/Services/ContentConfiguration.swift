@@ -111,7 +111,7 @@ class RealContentSeed {
     /// Get real podcast feeds for seeding
     func getRealPodcasts() -> [(title: String, feedURL: String, description: String)] {
         return ContentEnrichmentService.shared.getPopularPodcasts().prefix(5).map { feed in
-            (title: feed.title, feedURL: feed.feedURL, description: feed.description ?? "")
+            (title: feed.title, feedURL: feed.feedURL, description: feed.description)
         }
     }
 
