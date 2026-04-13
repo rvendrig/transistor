@@ -224,6 +224,68 @@ class NPOAPIService {
         return results
     }
 
+    // MARK: - Fetch Gids (complete day schedule)
+
+    func fetchGids(forChannel channelId: String, date: Date? = nil) async throws -> [NPOGidsItem] {
+        guard let baseURL = Self.stationURLs[channelId] else {
+            throw NPOAPIError.invalidURL
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "dd-MM-yyyy"
+        let dateStr = dateFormatter.string(from: date ?? Date())
+
+        guard let url = URL(string: "\(baseURL)/gids?date=\(dateStr)") else {
+            throw NPOAPIError.invalidURL
+        }
+
+        let (data, response) = try await session.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw NPOAPIError.invalidResponse
+        }
+
+        return parseGids(html: html)
+    }
+
+    private func parseGids(html: String) -> [NPOGidsItem] {
+        guard let jsonRange = html.range(of: "\"application/json\""),
+              let scriptStart = html[jsonRange.upperBound...].range(of: ">"),
+              let scriptEnd = html[scriptStart.upperBound...].range(of: "</script>") else {
+            return []
+        }
+
+        let jsonString = String(html[scriptStart.upperBound..<scriptEnd.lowerBound])
+
+        guard let jsonData = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let props = (json["props"] as? [String: Any])?["pageProps"] as? [String: Any],
+              let programmes = props["programmes"] as? [[String: Any]] else {
+            return []
+        }
+
+        return programmes.compactMap { p in
+            guard let name = p["name"] as? String,
+                  let time = p["fromToTime"] as? String else { return nil }
+
+            let presentersArr = (p["presenters"] as? [[String: Any]])?.compactMap { $0["name"] as? String } ?? []
+            let presenters = presentersArr.isEmpty ? nil : presentersArr.joined(separator: ", ")
+
+            return NPOGidsItem(
+                name: name,
+                fromToTime: time,
+                imageUrl: p["imageUrl"] as? String,
+                presenters: presenters,
+                broadcastUrl: p["url"] as? String,
+                isActive: p["active"] as? Bool ?? false
+            )
+        }
+    }
+
     // MARK: - Fetch broadcast detail (uitzendingen page scrape)
 
     func fetchBroadcastDetail(forChannel channelId: String, broadcastUrl: String) async throws -> NPOBroadcastDetail? {
@@ -746,6 +808,15 @@ struct NPOFragment {
     let imageUrl: String?
     let type: String?
     let url: String?
+}
+
+struct NPOGidsItem {
+    let name: String
+    let fromToTime: String        // "09:30 - 11:30"
+    let imageUrl: String?
+    let presenters: String?
+    let broadcastUrl: String?     // "/uitzendingen/{slug}/{uuid}/{date}"
+    let isActive: Bool            // nu op de radio
 }
 
 struct NPOBroadcastListItem {

@@ -423,43 +423,63 @@ struct BrowseScheduleView: View {
                 }
 
                 ForEach(broadcasts) { broadcast in
+                    let state = broadcastState(broadcast)
+
                     NavigationLink(value: broadcast) {
                         HStack(alignment: .top, spacing: 12) {
+                            // Tijdblok
                             VStack(alignment: .trailing, spacing: 2) {
                                 Text(timeFormatter.string(from: broadcast.startTime))
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(isNow(broadcast) ? .transistorGreen : .white)
+                                    .foregroundColor(state == .live ? .transistorGreen : state == .pastNoAudio ? .gray.opacity(0.5) : .white)
                                 let endTime = broadcast.startTime.addingTimeInterval(Double(broadcast.duration))
                                 Text(timeFormatter.string(from: endTime))
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.gray.opacity(state == .pastNoAudio ? 0.4 : 1))
                             }
                             .frame(width: 45)
 
+                            // Info
                             VStack(alignment: .leading, spacing: 4) {
-                                if isNow(broadcast) {
-                                    Text("NU")
-                                        .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.black)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.transistorGreen)
-                                        .cornerRadius(4)
+                                HStack(spacing: 6) {
+                                    if state == .live {
+                                        Text("NU")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.black)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.transistorGreen)
+                                            .cornerRadius(4)
+                                    }
+
+                                    // Audio-indicator
+                                    if state == .pastWithAudio {
+                                        Image(systemName: "play.circle.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.transistorGreen)
+                                    } else if state == .upcoming {
+                                        Image(systemName: "clock")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
                                 }
+
                                 Text(broadcast.displayTitle)
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(state == .pastNoAudio ? .gray : .white)
+
                                 if let desc = broadcast.description, !desc.isEmpty {
                                     Text(desc)
                                         .font(.caption)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.gray.opacity(state == .pastNoAudio ? 0.5 : 1))
                                         .lineLimit(2)
                                 }
                             }
                         }
                         .padding(.vertical, 6)
+                        .opacity(state == .pastNoAudio ? 0.6 : 1.0)
                     }
                 }
             }
@@ -489,10 +509,28 @@ struct BrowseScheduleView: View {
         Task { await loadSchedule() }
     }
 
-    private func isNow(_ broadcast: Broadcast) -> Bool {
+    enum ScheduleItemState {
+        case live           // nu op de radio
+        case pastWithAudio  // afgelopen, detailUrl beschikbaar (terugluisteren)
+        case pastNoAudio    // afgelopen, geen detailUrl (uitgegrijsd)
+        case upcoming       // nog niet begonnen
+    }
+
+    private func broadcastState(_ broadcast: Broadcast) -> ScheduleItemState {
         let now = Date()
         let endTime = broadcast.startTime.addingTimeInterval(Double(broadcast.duration))
-        return broadcast.startTime <= now && now <= endTime
+
+        if broadcast.startTime <= now && now <= endTime {
+            return .live
+        } else if endTime < now {
+            return broadcast.detailUrl != nil ? .pastWithAudio : .pastNoAudio
+        } else {
+            return .upcoming
+        }
+    }
+
+    private func isNow(_ broadcast: Broadcast) -> Bool {
+        broadcastState(broadcast) == .live
     }
 
     private func shortcutPill(icon: String? = nil, label: String, showSpinner: Bool = false) -> some View {
@@ -658,43 +696,38 @@ struct BrowseScheduleView: View {
     }
 
     private func loadSchedule() async {
-        guard let provider = viewModel.providerStore.provider(byId: channel.providerId) else { return }
         isLoading = true
         do {
-            if Calendar.current.isDateInToday(selectedDate) {
-                broadcasts = try await provider.fetchBroadcasts(forChannel: channel.id)
-            } else {
-                // Voor andere dagen: gebruik uitzendingen-lijst en filter op datum
-                let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channel.id)
+            // Gebruik /gids voor complete dagprogrammering (werkt voor elke datum)
+            let gidsItems = try await NPOAPIService.shared.fetchGids(
+                forChannel: channel.id,
+                date: selectedDate
+            )
 
-                // Filter: match "Gisteren", "Vandaag", of datumformat "Za 11 apr"
-                let targetLabel = dateLabel(for: selectedDate)
-                let filtered = list.filter { item in
-                    guard let date = item.date else { return false }
-                    return date.lowercased() == targetLabel.lowercased()
-                }
+            let isToday = Calendar.current.isDateInToday(selectedDate)
+            let isPast = selectedDate < Calendar.current.startOfDay(for: Date())
 
-                // Als er geen match is, toon alles (de pagina geeft ~20 items over meerdere dagen)
-                let items = filtered.isEmpty ? list : filtered
+            broadcasts = gidsItems.compactMap { item in
+                let (startTime, duration) = parseTimeRange(item.fromToTime, on: selectedDate)
 
-                broadcasts = items.compactMap { item in
-                    let (startTime, duration) = parseTimeRange(item.time, on: selectedDate)
-                    return Broadcast(
-                        id: item.url,
-                        providerId: "npo",
-                        title: item.title,
-                        showId: nil,
-                        channelId: channel.id,
-                        seasonId: nil,
-                        startTime: startTime,
-                        duration: duration,
-                        description: nil,
-                        image: item.imageUrl,
-                        audioUrl: nil,
-                        titleOverride: nil,
-                        detailUrl: nil
-                    )
-                }
+                // Audio URL: alleen voor vandaag + live items
+                let audioUrl = (isToday && item.isActive) ? NPOAPIService.streamURLs[channel.id] : nil
+
+                return Broadcast(
+                    id: item.broadcastUrl ?? "\(channel.id)-\(item.fromToTime)",
+                    providerId: "npo",
+                    title: item.name,
+                    showId: nil,
+                    channelId: channel.id,
+                    seasonId: nil,
+                    startTime: startTime,
+                    duration: duration,
+                    description: item.presenters,
+                    image: item.imageUrl,
+                    audioUrl: audioUrl,
+                    titleOverride: nil,
+                    detailUrl: item.broadcastUrl
+                )
             }
         } catch {
             viewModel.errorMessage = error.localizedDescription
