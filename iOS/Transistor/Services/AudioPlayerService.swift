@@ -158,8 +158,11 @@ class AudioPlayerService: NSObject, ObservableObject {
         player?.seek(to: cmTime)
     }
 
+    @Published var playbackRate: Float = 1.0
+
     func setPlaybackRate(_ rate: Float) {
         player?.rate = rate
+        playbackRate = rate
     }
 
     private func addPeriodicTimeObserver() {

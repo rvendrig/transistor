@@ -440,8 +440,10 @@ struct BrowseScheduleView: View {
                 }
             }
             .listStyle(.plain)
+            .frame(maxHeight: .infinity)
         }
         .navigationTitle(channel.currentTitle)
+        .navigationBarTitleDisplayMode(.inline)
         .background(Color.darkBg)
         .onAppear {
             Task { await loadSchedule() }
