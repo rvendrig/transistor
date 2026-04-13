@@ -109,10 +109,36 @@ class RSSFeedParser: NSObject, XMLParserDelegate {
     private var currentDescription = ""
     private var currentAudioURL = ""
     private var currentPublishDate = ""
+    private var currentDuration = ""
+    private var currentEpisodeNumber = ""
+    private var currentSeasonNumber = ""
+    private var currentEpisodeType = ""
+    private var currentImageUrl = ""
     private var episodes: [Episode] = []
     private var feedTitle = ""
     private var feedDescription = ""
     private var feedImage = ""
+    private var insideItem = false
+    private var insideChannel = true
+    private var episodeCounter = 0
+
+    // RFC 2822 date formats used by RSS feeds
+    private static let dateFormatters: [DateFormatter] = {
+        let formats = [
+            "EEE, dd MMM yyyy HH:mm:ss Z",      // Sat, 11 Apr 2026 15:45:00 +0200
+            "EEE, dd MMM yyyy HH:mm:ss zzz",     // Sat, 11 Apr 2026 15:45:00 CEST
+            "EEE, d MMM yyyy HH:mm:ss Z",        // Sat, 1 Apr 2026 15:45:00 +0200
+            "dd MMM yyyy HH:mm:ss Z",             // 11 Apr 2026 15:45:00 +0200
+            "yyyy-MM-dd'T'HH:mm:ssZ",             // ISO 8601 fallback
+            "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        ]
+        return formats.map { format in
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = format
+            return f
+        }
+    }()
 
     func parse(_ data: Data) throws -> PodcastFeed {
         let parser = XMLParser(data: data)
@@ -132,27 +158,78 @@ class RSSFeedParser: NSObject, XMLParserDelegate {
         )
     }
 
+    private func parseDate(_ string: String) -> Date? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        for formatter in Self.dateFormatters {
+            if let date = formatter.date(from: trimmed) {
+                return date
+            }
+        }
+        return nil
+    }
+
+    private func parseDuration(_ string: String) -> Int {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Format: HH:MM:SS or MM:SS or just seconds
+        let parts = trimmed.components(separatedBy: ":")
+        switch parts.count {
+        case 3: // HH:MM:SS
+            let h = Int(parts[0]) ?? 0
+            let m = Int(parts[1]) ?? 0
+            let s = Int(parts[2]) ?? 0
+            return h * 3600 + m * 60 + s
+        case 2: // MM:SS
+            let m = Int(parts[0]) ?? 0
+            let s = Int(parts[1]) ?? 0
+            return m * 60 + s
+        case 1: // seconds
+            return Int(parts[0]) ?? 0
+        default:
+            return 0
+        }
+    }
+
     // MARK: - XMLParserDelegate
-    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String: String] = [:]) {
         currentElement = elementName
+
+        if elementName == "item" {
+            insideItem = true
+            insideChannel = false
+        }
 
         if elementName == "enclosure" {
             currentAudioURL = attributeDict["url"] ?? ""
         }
+
+        // itunes:image can be on channel or item level
+        if elementName == "itunes:image" {
+            let href = attributeDict["href"] ?? ""
+            if insideItem {
+                currentImageUrl = href
+            } else {
+                feedImage = href
+            }
+        }
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        let trimmedString = string.trimmingCharacters(in: .whitespaces)
-
         switch currentElement {
         case "title":
-            currentTitle += trimmedString
+            if insideItem { currentTitle += string } else { feedTitle += string }
         case "description":
-            currentDescription += trimmedString
+            if insideItem { currentDescription += string } else { feedDescription += string }
         case "pubDate":
-            currentPublishDate += trimmedString
-        case "image":
-            feedImage += trimmedString
+            currentPublishDate += string
+        case "itunes:duration":
+            currentDuration += string
+        case "itunes:episode":
+            currentEpisodeNumber += string
+        case "itunes:season":
+            currentSeasonNumber += string
+        case "itunes:episodeType":
+            currentEpisodeType += string
         default:
             break
         }
@@ -160,32 +237,51 @@ class RSSFeedParser: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
         if elementName == "item" {
-            // Create episode
-            let dateFormatter = ISO8601DateFormatter()
-            let pubDate = dateFormatter.date(from: currentPublishDate) ?? Date()
+            episodeCounter += 1
+
+            let pubDate = parseDate(currentPublishDate) ?? Date.distantPast
+            let duration = parseDuration(currentDuration)
+
+            // Build title with episode number if available
+            let epNum = Int(currentEpisodeNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+            let seasonNum = Int(currentSeasonNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+
+            var displayTitle = currentTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Prefix with S01E03 style if numbers present but not already in title
+            if let s = seasonNum, let e = epNum, !displayTitle.contains("S\(s)") {
+                displayTitle = "S\(s)E\(e): \(displayTitle)"
+            } else if let e = epNum, !displayTitle.contains("#\(e)") && !displayTitle.contains("Ep \(e)") {
+                displayTitle = "#\(e): \(displayTitle)"
+            }
 
             let episode = Episode(
                 id: UUID().uuidString,
                 providerId: "podcast_feed",
-                title: currentTitle,
+                title: displayTitle,
                 showId: nil,
-                seasonId: nil,
-                feedTitle: feedTitle,
+                seasonId: seasonNum.map { "season-\($0)" },
+                feedTitle: feedTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 publishDate: pubDate,
-                duration: 0, // Would need to be parsed from media:duration or similar
+                duration: duration,
                 audioUrl: currentAudioURL.isEmpty ? nil : currentAudioURL,
-                description: currentDescription.isEmpty ? nil : currentDescription,
-                image: feedImage.isEmpty ? nil : feedImage,
+                description: currentDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : currentDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+                image: currentImageUrl.isEmpty ? (feedImage.isEmpty ? nil : feedImage) : currentImageUrl,
                 titleOverride: nil
             )
 
             episodes.append(episode)
 
-            // Reset
+            // Reset item fields
             currentTitle = ""
             currentDescription = ""
             currentAudioURL = ""
             currentPublishDate = ""
+            currentDuration = ""
+            currentEpisodeNumber = ""
+            currentSeasonNumber = ""
+            currentEpisodeType = ""
+            currentImageUrl = ""
+            insideItem = false
         }
 
         currentElement = ""
