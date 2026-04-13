@@ -2,6 +2,11 @@ import SwiftUI
 
 struct BrowseView: View {
     @StateObject private var viewModel = ContentViewModel()
+    @StateObject private var podcastProvider = PodcastFeedProvider()
+    @State private var showAddPodcast = false
+    @State private var podcastURL = ""
+    @State private var isLoadingPodcast = false
+    @State private var podcastError: String?
 
     var body: some View {
         NavigationStack {
@@ -66,7 +71,7 @@ struct BrowseView: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                             Spacer()
-                            Button(action: { /* TODO: voeg podcast toe */ }) {
+                            Button(action: { showAddPodcast = true }) {
                                 Label("Voeg toe", systemImage: "plus.circle.fill")
                                     .font(.subheadline)
                                     .foregroundColor(.transistorGreen)
@@ -74,8 +79,7 @@ struct BrowseView: View {
                         }
                         .padding(.horizontal)
 
-                        let podcasts = ContentEnrichmentService.shared.getPopularPodcasts()
-                        if podcasts.isEmpty {
+                        if podcastProvider.feeds.isEmpty {
                             VStack(spacing: 8) {
                                 Image(systemName: "mic")
                                     .font(.system(size: 30))
@@ -87,32 +91,43 @@ struct BrowseView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                         } else {
-                            ForEach(podcasts, id: \.id) { podcast in
-                                HStack(spacing: 12) {
-                                    Image(systemName: "mic.fill")
-                                        .foregroundColor(.transistorGreen)
-                                        .frame(width: 40, height: 40)
-                                        .background(Color.cardBg)
-                                        .cornerRadius(8)
+                            ForEach(podcastProvider.feeds, id: \.id) { podcast in
+                                NavigationLink(destination: PodcastDetailView(podcast: podcast, provider: podcastProvider)) {
+                                    HStack(spacing: 12) {
+                                        if let imageUrl = podcast.image, let url = URL(string: imageUrl) {
+                                            AsyncImage(url: url) { image in
+                                                image.resizable().aspectRatio(contentMode: .fill)
+                                            } placeholder: {
+                                                Rectangle().fill(Color.cardBg)
+                                            }
+                                            .frame(width: 50, height: 50)
+                                            .cornerRadius(8)
+                                        } else {
+                                            Image(systemName: "mic.fill")
+                                                .foregroundColor(.transistorGreen)
+                                                .frame(width: 50, height: 50)
+                                                .background(Color.cardBg)
+                                                .cornerRadius(8)
+                                        }
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(podcast.title)
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.white)
-                                        Text(podcast.description)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(podcast.title)
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(.white)
+                                            Text("\(podcast.episodes.count) afleveringen")
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+
+                                        Spacer()
+
+                                        Image(systemName: "chevron.right")
                                             .font(.caption)
                                             .foregroundColor(.gray)
-                                            .lineLimit(1)
                                     }
-
-                                    Spacer()
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
+                                    .padding(.horizontal)
                                 }
-                                .padding(.horizontal)
                             }
                         }
                     }
@@ -126,6 +141,28 @@ struct BrowseView: View {
             }
             .navigationDestination(for: Broadcast.self) { broadcast in
                 BroadcastDetailView(broadcast: broadcast, channelId: broadcast.channelId ?? "")
+            }
+            .sheet(isPresented: $showAddPodcast) {
+                AddPodcastSheet(
+                    podcastURL: $podcastURL,
+                    isLoading: $isLoadingPodcast,
+                    error: $podcastError,
+                    onAdd: { url in
+                        isLoadingPodcast = true
+                        podcastError = nil
+                        Task {
+                            do {
+                                try await podcastProvider.addFeed(url)
+                                isLoadingPodcast = false
+                                showAddPodcast = false
+                                podcastURL = ""
+                            } catch {
+                                podcastError = error.localizedDescription
+                                isLoadingPodcast = false
+                            }
+                        }
+                    }
+                )
             }
             .onAppear {
                 Task {
@@ -324,6 +361,40 @@ struct BrowseScheduleView: View {
         return keywords.contains(where: { title.contains($0) })
     }
 
+    private func dateLabel(for date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Vandaag" }
+        if calendar.isDateInYesterday(date) { return "Gisteren" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "nl_NL")
+        f.dateFormat = "EEE d MMM"  // "Za 11 apr"
+        return f.string(from: date).replacingOccurrences(of: ".", with: "")
+    }
+
+    private func parseTimeRange(_ timeStr: String?, on date: Date) -> (Date, Int) {
+        guard let timeStr else { return (date, 0) }
+        // Format: "14:00 - 15:00"
+        let parts = timeStr.components(separatedBy: " - ")
+        guard parts.count == 2 else { return (date, 0) }
+
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+
+        func parseHHMM(_ str: String) -> Date? {
+            let hm = str.trimmingCharacters(in: .whitespaces).components(separatedBy: ":")
+            guard hm.count == 2, let h = Int(hm[0]), let m = Int(hm[1]) else { return nil }
+            var dc = components
+            dc.hour = h
+            dc.minute = m
+            return calendar.date(from: dc)
+        }
+
+        guard let start = parseHHMM(parts[0]) else { return (date, 0) }
+        let end = parseHHMM(parts[1]) ?? start
+        let duration = max(0, Int(end.timeIntervalSince(start)))
+        return (start, duration)
+    }
+
     private func loadSchedule() async {
         guard let provider = viewModel.providerStore.provider(byId: channel.providerId) else { return }
         isLoading = true
@@ -331,21 +402,31 @@ struct BrowseScheduleView: View {
             if Calendar.current.isDateInToday(selectedDate) {
                 broadcasts = try await provider.fetchBroadcasts(forChannel: channel.id)
             } else {
-                // Voor andere dagen: probeer uitzendingen-pagina te scrapen
+                // Voor andere dagen: gebruik uitzendingen-lijst en filter op datum
                 let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channel.id)
-                // Filter op datum — de list items hebben formattedDate maar geen exacte datum
-                // Voorlopig tonen we de beschikbare uitzendingen
-                broadcasts = list.compactMap { item in
-                    Broadcast(
+
+                // Filter: match "Gisteren", "Vandaag", of datumformat "Za 11 apr"
+                let targetLabel = dateLabel(for: selectedDate)
+                let filtered = list.filter { item in
+                    guard let date = item.date else { return false }
+                    return date.lowercased() == targetLabel.lowercased()
+                }
+
+                // Als er geen match is, toon alles (de pagina geeft ~20 items over meerdere dagen)
+                let items = filtered.isEmpty ? list : filtered
+
+                broadcasts = items.compactMap { item in
+                    let (startTime, duration) = parseTimeRange(item.time, on: selectedDate)
+                    return Broadcast(
                         id: item.url,
                         providerId: "npo",
                         title: item.title,
                         showId: nil,
                         channelId: channel.id,
                         seasonId: nil,
-                        startTime: selectedDate,
-                        duration: 0,
-                        description: item.time,
+                        startTime: startTime,
+                        duration: duration,
+                        description: nil,
                         image: item.imageUrl,
                         audioUrl: nil,
                         titleOverride: nil
@@ -631,42 +712,70 @@ struct BroadcastDetailView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal)
 
-            ForEach(fragments, id: \.id) { fragment in
-                HStack(spacing: 12) {
-                    if let imageUrl = fragment.imageUrl, let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle().fill(Color.cardBg)
+            ForEach(Array(fragments.enumerated()), id: \.element.id) { index, fragment in
+                Button(action: {
+                    playFragment(fragment, index: index, totalFragments: fragments.count)
+                }) {
+                    HStack(spacing: 12) {
+                        if let imageUrl = fragment.imageUrl, let url = URL(string: imageUrl) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle().fill(Color.cardBg)
+                            }
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(8)
                         }
-                        .frame(width: 60, height: 60)
-                        .cornerRadius(8)
-                    }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(fragment.name)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .lineLimit(2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(fragment.name)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .lineLimit(2)
 
-                        if let type = fragment.type {
-                            Text(type.capitalized)
-                                .font(.caption)
-                                .foregroundColor(.transistorGreen)
+                            if let type = fragment.type {
+                                Text(type.capitalized)
+                                    .font(.caption)
+                                    .foregroundColor(.transistorGreen)
+                            }
                         }
+
+                        Spacer()
+
+                        Image(systemName: "play.circle.fill")
+                            .foregroundColor(.transistorGreen)
+                            .font(.title3)
                     }
-
-                    Spacer()
-
-                    Image(systemName: "play.circle")
-                        .foregroundColor(.transistorGreen)
-                        .font(.title3)
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
         }
         .padding(.top, 8)
+    }
+
+    private func playFragment(_ fragment: NPOFragment, index: Int, totalFragments: Int) {
+        // Speel de terugluister-MP3 van de uitzending af op het geschatte tijdstip
+        guard let listenBackUrl = detail?.listenBackUrl, !listenBackUrl.isEmpty else { return }
+
+        // Schat het tijdstip: verdeel de uitzending evenredig over de fragmenten
+        let estimatedOffset = totalFragments > 1
+            ? Double(index) / Double(totalFragments) * Double(broadcast.duration)
+            : 0
+
+        Task {
+            await audioPlayer.playOnDemand(
+                url: listenBackUrl,
+                title: fragment.name,
+                imageUrl: fragment.imageUrl ?? detail?.imageUrl ?? broadcast.image,
+                source: "npo"
+            )
+            // Seek naar het geschatte tijdstip na korte delay (wacht op buffering)
+            if estimatedOffset > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 seconde
+                audioPlayer.seek(to: estimatedOffset)
+            }
+        }
     }
 
     // MARK: - Tracks
@@ -1138,6 +1247,159 @@ struct BroadcastFromUrlView: View {
             print("Error loading broadcast from URL: \(error)")
         }
         isLoading = false
+    }
+}
+
+// MARK: - Podcast toevoegen sheet
+
+struct AddPodcastSheet: View {
+    @Binding var podcastURL: String
+    @Binding var isLoading: Bool
+    @Binding var error: String?
+    let onAdd: (String) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Voeg een podcast toe")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+
+                TextField("RSS feed URL", text: $podcastURL)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+
+                if let error {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+
+                Button(action: { onAdd(podcastURL) }) {
+                    if isLoading {
+                        ProgressView().tint(.black)
+                    } else {
+                        Text("Toevoegen")
+                    }
+                }
+                .font(.headline)
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(podcastURL.isEmpty ? Color.gray : Color.transistorGreen)
+                .cornerRadius(12)
+                .disabled(podcastURL.isEmpty || isLoading)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Voorbeelden:")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    ForEach(["https://podcast.npo.nl/feed/argos.xml",
+                             "https://feeds.acast.com/public/shows/ologies"], id: \.self) { example in
+                        Button(action: { podcastURL = example }) {
+                            Text(example)
+                                .font(.caption)
+                                .foregroundColor(.transistorGreen)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+            .padding()
+            .background(Color.darkBg)
+        }
+    }
+}
+
+// MARK: - Podcast detail (episodes lijst)
+
+struct PodcastDetailView: View {
+    let podcast: PodcastFeed
+    let provider: PodcastFeedProvider
+    @EnvironmentObject var audioPlayer: AudioPlayerService
+
+    private let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "nl_NL")
+        f.dateStyle = .medium
+        return f
+    }()
+
+    var body: some View {
+        List {
+            // Header
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let imageUrl = podcast.image, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle().fill(Color.cardBg)
+                        }
+                        .frame(height: 150)
+                        .clipped()
+                        .cornerRadius(12)
+                    }
+
+                    Text(podcast.description)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+            }
+            .listRowBackground(Color.clear)
+
+            // Episodes
+            Section(header: Text("\(podcast.episodes.count) afleveringen").foregroundColor(.white)) {
+                ForEach(podcast.episodes) { episode in
+                    Button(action: {
+                        Task {
+                            await audioPlayer.playOnDemand(
+                                url: episode.audioUrl ?? "",
+                                title: episode.title,
+                                imageUrl: episode.image ?? podcast.image,
+                                source: "podcast"
+                            )
+                        }
+                    }) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(episode.title)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+
+                            HStack(spacing: 8) {
+                                Text(dateFormatter.string(from: episode.publishDate))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+
+                                if episode.duration > 0 {
+                                    Text("\(episode.duration / 60) min")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+
+                            if let desc = episode.description, !desc.isEmpty {
+                                Text(desc)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .lineLimit(3)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle(podcast.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .background(Color.darkBg)
     }
 }
 

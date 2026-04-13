@@ -1,13 +1,13 @@
 import Foundation
 
 // MARK: - Podcast Feed Provider
-class PodcastFeedProvider: ContentProvider {
+class PodcastFeedProvider: ContentProvider, ObservableObject {
     let id = "podcast_feed"
     let name = "Podcast Feeds"
     let type = ProviderType.podcastPlatform
     let logo: String? = nil
 
-    private var feeds: [PodcastFeed] = []
+    @Published var feeds: [PodcastFeed] = []
 
     init() {
         loadFeeds()

@@ -7,12 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		09A880B7AC2DD8C9157F452D /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5EA90853F4B66CE0F00FC64 /* ScheduleView.swift */; };
 		1263FDDB023A0D52440B5B91 /* ContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93603E59A3CF17057CA1E97E /* ContentProvider.swift */; };
 		1DD5E72BC9748EA9CF4419D6 /* TransistorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1E388A80A81DA7ECB8AA5F /* TransistorApp.swift */; };
+		27790E695C1EC27D54772663 /* BBCProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D351D48A1D78269FDA0ED7FC /* BBCProvider.swift */; };
 		2AA91FB4B662B77F8EDD374C /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C3935C4662F87E7993A7022 /* AudioPlayerService.swift */; };
 		3FD203AA7B9E062469E85707 /* ContentConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B433353F6F7CFAE2D100F438 /* ContentConfiguration.swift */; };
-		40D80FF00D2BE88CD77E57B4 /* PromptInterface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD4F27505F356C5E9A65D43 /* PromptInterface.swift */; };
 		4744B9ABA52BF0A49C5B693D /* CreatePlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54098BFD1E0CCE819A8F337 /* CreatePlaylistView.swift */; };
 		4931862E5F9C62C48FB090F0 /* PodcastFeedProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B50974D638DDA79A94A5CAB /* PodcastFeedProvider.swift */; };
 		515B74D8189D601901AEF980 /* NPODataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33E1D3638C6673FE826807D /* NPODataService.swift */; };
@@ -22,16 +21,12 @@
 		609C31175D48B87946D98891 /* MarkerCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */; };
 		62B18744EC7606BE87E17719 /* FavoritesButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 070C3442252A7AEFC68248DB /* FavoritesButton.swift */; };
 		64D24608784059587A20FFFA /* MarkerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */; };
-		69B3F90FA3E0C17F0F8F64F0 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B87B5304C86AC393CD6BBFE /* DiscoverView.swift */; };
-		71FB8F081776BEF07544AA85 /* ProvidersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035B68226F58B6FB6E4777F4 /* ProvidersView.swift */; };
 		73E92EA90D48EF12F2302792 /* PlaylistDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530A8C92CA984E1733662744 /* PlaylistDetailView.swift */; };
 		76C07EF2CBD263030FB34039 /* ContentWizardBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAB182B421ACCD9188D119 /* ContentWizardBase.swift */; };
 		82F653D16C529973CA92B5C8 /* GenericModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5483D8FC4DA0AF1423EF5E5 /* GenericModels.swift */; };
 		840D04EE4A9F0CE736DF392F /* PlaylistsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E841B1C3A21E52F70A1DA7E /* PlaylistsView.swift */; };
 		8DEC9A9365B8FCFCDFCE072D /* NPOChannelsViewUpdated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2BAD73B3FAC606FA35D8E0 /* NPOChannelsViewUpdated.swift */; };
-		90FC94C53701E51B41528ADA /* LivePlaybackDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DC020F1E0389E967E596F88 /* LivePlaybackDisplay.swift */; };
 		9285747207F0DDACAE43B70E /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC4265DAC1BD0E98D7C0E8C /* DatabaseService.swift */; };
-		9F40AE23AB43523A968D0AE3 /* ListeningLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A528907094F7D1C1D9FA8F /* ListeningLogView.swift */; };
 		A324B632C416E5B7A7F3F594 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295A88469DBC9A0857045502 /* ContentViewModel.swift */; };
 		A4F80B8074BDA84F74D105E6 /* NPOAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF8CF7C80C2D547F31E5086D /* NPOAPIService.swift */; };
 		A97CF357FCAC065F1DD429F3 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE3EB1F1011EBC185C29A77 /* SearchView.swift */; };
@@ -43,23 +38,17 @@
 		E8938C247F5AD37651BB6F8B /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D3F687D3C46D2638154257 /* LogView.swift */; };
 		EE56E21A092C4251D68E8338 /* PlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC9AF6C1D4E2FE5795DCF2F /* PlaybackView.swift */; };
 		F3D4A947515D9A93561BA45D /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595BB61A1E28FCDB942FAA06 /* BrowseView.swift */; };
-		F57E8419ABCB49DF6660C3BE /* ListeningHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133FA771247F60BB856AEA5A /* ListeningHubView.swift */; };
 		F76E8712E970DA7CA78AFAAF /* ScheduleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C50E056DDD8A6F71724DAC0 /* ScheduleModels.swift */; };
 		FFC3FB6CCC8B49E6D56FDF43 /* AudioPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7BABCB2CD7E029EB2ABC3AD /* AudioPlayerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		035B68226F58B6FB6E4777F4 /* ProvidersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvidersView.swift; sourceTree = "<group>"; };
 		0558613BC935522BB7058526 /* Transistor.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Transistor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		070C3442252A7AEFC68248DB /* FavoritesButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesButton.swift; sourceTree = "<group>"; };
 		0A1E388A80A81DA7ECB8AA5F /* TransistorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransistorApp.swift; sourceTree = "<group>"; };
 		0A22DA9F839BF3D0CAAFCBD6 /* ContentEnrichmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentEnrichmentService.swift; sourceTree = "<group>"; };
-		133FA771247F60BB856AEA5A /* ListeningHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHubView.swift; sourceTree = "<group>"; };
 		15504EFCED5CF09EFD961675 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		1B87B5304C86AC393CD6BBFE /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
-		1DC020F1E0389E967E596F88 /* LivePlaybackDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlaybackDisplay.swift; sourceTree = "<group>"; };
 		295A88469DBC9A0857045502 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
-		2AD4F27505F356C5E9A65D43 /* PromptInterface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptInterface.swift; sourceTree = "<group>"; };
 		2C3935C4662F87E7993A7022 /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerService.swift; sourceTree = "<group>"; };
 		43FAB182B421ACCD9188D119 /* ContentWizardBase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentWizardBase.swift; sourceTree = "<group>"; };
 		4B50974D638DDA79A94A5CAB /* PodcastFeedProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastFeedProvider.swift; sourceTree = "<group>"; };
@@ -70,7 +59,6 @@
 		69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkerListView.swift; sourceTree = "<group>"; };
 		6E2BAD73B3FAC606FA35D8E0 /* NPOChannelsViewUpdated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOChannelsViewUpdated.swift; sourceTree = "<group>"; };
 		84D3F687D3C46D2638154257 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
-		87A528907094F7D1C1D9FA8F /* ListeningLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningLogView.swift; sourceTree = "<group>"; };
 		8AC4265DAC1BD0E98D7C0E8C /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		8E44641870D2759C9974E7DC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8E841B1C3A21E52F70A1DA7E /* PlaylistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistsView.swift; sourceTree = "<group>"; };
@@ -80,10 +68,10 @@
 		AF8CF7C80C2D547F31E5086D /* NPOAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOAPIService.swift; sourceTree = "<group>"; };
 		B055A7E0D5846B379EB6C85F /* AddToPlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToPlaylistView.swift; sourceTree = "<group>"; };
 		B433353F6F7CFAE2D100F438 /* ContentConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentConfiguration.swift; sourceTree = "<group>"; };
-		B5EA90853F4B66CE0F00FC64 /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleView.swift; sourceTree = "<group>"; };
 		B815790244BD61BEC25BEEE2 /* NPOProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOProvider.swift; sourceTree = "<group>"; };
 		C54098BFD1E0CCE819A8F337 /* CreatePlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePlaylistView.swift; sourceTree = "<group>"; };
 		CAE3EB1F1011EBC185C29A77 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
+		D351D48A1D78269FDA0ED7FC /* BBCProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BBCProvider.swift; sourceTree = "<group>"; };
 		D5483D8FC4DA0AF1423EF5E5 /* GenericModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericModels.swift; sourceTree = "<group>"; };
 		E33E1D3638C6673FE826807D /* NPODataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPODataService.swift; sourceTree = "<group>"; };
 		E7BABCB2CD7E029EB2ABC3AD /* AudioPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerView.swift; sourceTree = "<group>"; };
@@ -95,6 +83,7 @@
 		1628AAD43D0BD75FDD9A7566 /* Providers */ = {
 			isa = PBXGroup;
 			children = (
+				D351D48A1D78269FDA0ED7FC /* BBCProvider.swift */,
 				93603E59A3CF17057CA1E97E /* ContentProvider.swift */,
 				B815790244BD61BEC25BEEE2 /* NPOProvider.swift */,
 				4B50974D638DDA79A94A5CAB /* PodcastFeedProvider.swift */,
@@ -155,12 +144,8 @@
 				E7BABCB2CD7E029EB2ABC3AD /* AudioPlayerView.swift */,
 				595BB61A1E28FCDB942FAA06 /* BrowseView.swift */,
 				C54098BFD1E0CCE819A8F337 /* CreatePlaylistView.swift */,
-				1B87B5304C86AC393CD6BBFE /* DiscoverView.swift */,
 				F8CC3B4A7B100EC3A469E7A6 /* EditPlaylistView.swift */,
 				070C3442252A7AEFC68248DB /* FavoritesButton.swift */,
-				133FA771247F60BB856AEA5A /* ListeningHubView.swift */,
-				87A528907094F7D1C1D9FA8F /* ListeningLogView.swift */,
-				1DC020F1E0389E967E596F88 /* LivePlaybackDisplay.swift */,
 				84D3F687D3C46D2638154257 /* LogView.swift */,
 				4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */,
 				69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */,
@@ -169,9 +154,6 @@
 				9AC9AF6C1D4E2FE5795DCF2F /* PlaybackView.swift */,
 				530A8C92CA984E1733662744 /* PlaylistDetailView.swift */,
 				8E841B1C3A21E52F70A1DA7E /* PlaylistsView.swift */,
-				2AD4F27505F356C5E9A65D43 /* PromptInterface.swift */,
-				035B68226F58B6FB6E4777F4 /* ProvidersView.swift */,
-				B5EA90853F4B66CE0F00FC64 /* ScheduleView.swift */,
 				CAE3EB1F1011EBC185C29A77 /* SearchView.swift */,
 				8E44641870D2759C9974E7DC /* SettingsView.swift */,
 				62C063E61EC636380AEF0520 /* Wizards */,
@@ -264,6 +246,7 @@
 				E86480481E44EA9645079539 /* AddToPlaylistView.swift in Sources */,
 				2AA91FB4B662B77F8EDD374C /* AudioPlayerService.swift in Sources */,
 				FFC3FB6CCC8B49E6D56FDF43 /* AudioPlayerView.swift in Sources */,
+				27790E695C1EC27D54772663 /* BBCProvider.swift in Sources */,
 				F3D4A947515D9A93561BA45D /* BrowseView.swift in Sources */,
 				3FD203AA7B9E062469E85707 /* ContentConfiguration.swift in Sources */,
 				567668AA33EBBAFC6F85A9DE /* ContentEnrichmentService.swift in Sources */,
@@ -272,13 +255,9 @@
 				76C07EF2CBD263030FB34039 /* ContentWizardBase.swift in Sources */,
 				4744B9ABA52BF0A49C5B693D /* CreatePlaylistView.swift in Sources */,
 				9285747207F0DDACAE43B70E /* DatabaseService.swift in Sources */,
-				69B3F90FA3E0C17F0F8F64F0 /* DiscoverView.swift in Sources */,
 				52BCAE0EB5991A56FC0BFBEF /* EditPlaylistView.swift in Sources */,
 				62B18744EC7606BE87E17719 /* FavoritesButton.swift in Sources */,
 				82F653D16C529973CA92B5C8 /* GenericModels.swift in Sources */,
-				F57E8419ABCB49DF6660C3BE /* ListeningHubView.swift in Sources */,
-				9F40AE23AB43523A968D0AE3 /* ListeningLogView.swift in Sources */,
-				90FC94C53701E51B41528ADA /* LivePlaybackDisplay.swift in Sources */,
 				E8938C247F5AD37651BB6F8B /* LogView.swift in Sources */,
 				609C31175D48B87946D98891 /* MarkerCreationSheet.swift in Sources */,
 				64D24608784059587A20FFFA /* MarkerListView.swift in Sources */,
@@ -293,10 +272,7 @@
 				73E92EA90D48EF12F2302792 /* PlaylistDetailView.swift in Sources */,
 				840D04EE4A9F0CE736DF392F /* PlaylistsView.swift in Sources */,
 				4931862E5F9C62C48FB090F0 /* PodcastFeedProvider.swift in Sources */,
-				40D80FF00D2BE88CD77E57B4 /* PromptInterface.swift in Sources */,
-				71FB8F081776BEF07544AA85 /* ProvidersView.swift in Sources */,
 				F76E8712E970DA7CA78AFAAF /* ScheduleModels.swift in Sources */,
-				09A880B7AC2DD8C9157F452D /* ScheduleView.swift in Sources */,
 				A97CF357FCAC065F1DD429F3 /* SearchView.swift in Sources */,
 				E56E1DDF3D8088FF92E9565A /* SettingsView.swift in Sources */,
 				1DD5E72BC9748EA9CF4419D6 /* TransistorApp.swift in Sources */,
