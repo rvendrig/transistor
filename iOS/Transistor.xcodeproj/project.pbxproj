@@ -22,6 +22,7 @@
 		609C31175D48B87946D98891 /* MarkerCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */; };
 		62B18744EC7606BE87E17719 /* FavoritesButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 070C3442252A7AEFC68248DB /* FavoritesButton.swift */; };
 		64D24608784059587A20FFFA /* MarkerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */; };
+		654398DFEF6DC92B50913BDF /* TopicCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47577BB43757C53CC6BD8AA3 /* TopicCardView.swift */; };
 		681BB65AA38B5D2DFB9A74DC /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5176CB7E95ACE61B78E108B /* NowPlayingView.swift */; };
 		73E92EA90D48EF12F2302792 /* PlaylistDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530A8C92CA984E1733662744 /* PlaylistDetailView.swift */; };
 		76C07EF2CBD263030FB34039 /* ContentWizardBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAB182B421ACCD9188D119 /* ContentWizardBase.swift */; };
@@ -53,6 +54,7 @@
 		295A88469DBC9A0857045502 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
 		2C3935C4662F87E7993A7022 /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerService.swift; sourceTree = "<group>"; };
 		43FAB182B421ACCD9188D119 /* ContentWizardBase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentWizardBase.swift; sourceTree = "<group>"; };
+		47577BB43757C53CC6BD8AA3 /* TopicCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopicCardView.swift; sourceTree = "<group>"; };
 		4B50974D638DDA79A94A5CAB /* PodcastFeedProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastFeedProvider.swift; sourceTree = "<group>"; };
 		4C50E056DDD8A6F71724DAC0 /* ScheduleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleModels.swift; sourceTree = "<group>"; };
 		4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkerCreationSheet.swift; sourceTree = "<group>"; };
@@ -162,6 +164,7 @@
 				8E841B1C3A21E52F70A1DA7E /* PlaylistsView.swift */,
 				CAE3EB1F1011EBC185C29A77 /* SearchView.swift */,
 				8E44641870D2759C9974E7DC /* SettingsView.swift */,
+				47577BB43757C53CC6BD8AA3 /* TopicCardView.swift */,
 				62C063E61EC636380AEF0520 /* Wizards */,
 			);
 			path = Views;
@@ -283,6 +286,7 @@
 				A97CF357FCAC065F1DD429F3 /* SearchView.swift in Sources */,
 				E56E1DDF3D8088FF92E9565A /* SettingsView.swift in Sources */,
 				14BCF729212065E1C5FA5AD6 /* TalpaProvider.swift in Sources */,
+				654398DFEF6DC92B50913BDF /* TopicCardView.swift in Sources */,
 				1DD5E72BC9748EA9CF4419D6 /* TransistorApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

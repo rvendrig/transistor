@@ -323,66 +323,19 @@ struct NowPlayingView: View {
                 }
                 .padding(.horizontal)
 
-                // Beschrijving
-                if let description = detail?.description, !description.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Over deze uitzending")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        Text(description)
-                            .font(.body)
-                            .foregroundColor(.gray)
+                // Onderwerpen (topics) of fallback beschrijving
+                if let detail {
+                    TopicsSectionView(
+                        topics: detail.topics,
+                        description: detail.description
+                    ) { topic, index in
+                        playFragment(
+                            NPOFragment(id: "\(index)", name: topic.title, imageUrl: topic.imageUrl, type: nil, url: topic.fragmentUrl),
+                            index: index,
+                            total: detail.topics.count,
+                            broadcast: broadcast
+                        )
                     }
-                    .padding(.horizontal)
-                }
-
-                // Fragmenten
-                if let detail, !detail.fragments.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Fragmenten")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal)
-
-                        ForEach(Array(detail.fragments.enumerated()), id: \.element.id) { index, fragment in
-                            Button(action: {
-                                playFragment(fragment, index: index, total: detail.fragments.count, broadcast: broadcast)
-                            }) {
-                                HStack(spacing: 12) {
-                                    if let imageUrl = fragment.imageUrl, let url = URL(string: imageUrl) {
-                                        AsyncImage(url: url) { image in
-                                            image.resizable().aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Rectangle().fill(Color.cardBg)
-                                        }
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(8)
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(fragment.name)
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.white)
-                                            .lineLimit(2)
-                                        if let type = fragment.type {
-                                            Text(type.capitalized)
-                                                .font(.caption)
-                                                .foregroundColor(.transistorGreen)
-                                        }
-                                    }
-
-                                    Spacer()
-
-                                    Image(systemName: "play.circle.fill")
-                                        .foregroundColor(.transistorGreen)
-                                        .font(.title3)
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
                 }
 
                 // Tracks

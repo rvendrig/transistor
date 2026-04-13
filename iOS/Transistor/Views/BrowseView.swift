@@ -803,22 +803,15 @@ struct BroadcastDetailView: View {
                 ctaButton
                     .padding(.horizontal)
 
-                // Beschrijving
-                if let description = detail?.description, !description.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Over deze uitzending")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        Text(description)
-                            .font(.body)
-                            .foregroundColor(.gray)
+                // Onderwerpen (topics) of fallback beschrijving
+                if let detail {
+                    TopicsSectionView(
+                        topics: detail.topics,
+                        description: detail.description
+                    ) { topic, index in
+                        let fragment = NPOFragment(id: "\(index)", name: topic.title, imageUrl: topic.imageUrl, type: nil, url: topic.fragmentUrl)
+                        playFragment(fragment, index: index, totalFragments: detail.topics.count)
                     }
-                    .padding(.horizontal)
-                }
-
-                // Fragmenten
-                if let detail, !detail.fragments.isEmpty {
-                    fragmentsSection(detail.fragments)
                 }
 
                 // Tracks
@@ -1422,55 +1415,12 @@ struct BroadcastFromUrlView: View {
                         .padding(.horizontal)
                     }
 
-                    // Beschrijving
-                    if let description = detail.description, !description.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Over deze uitzending")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Text(description)
-                                .font(.body)
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.horizontal)
-                    }
-
-                    // Fragmenten
-                    if !detail.fragments.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Fragmenten")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal)
-
-                            ForEach(detail.fragments, id: \.id) { fragment in
-                                HStack(spacing: 12) {
-                                    if let imageUrl = fragment.imageUrl, let url = URL(string: imageUrl) {
-                                        AsyncImage(url: url) { image in
-                                            image.resizable().aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Rectangle().fill(Color.cardBg)
-                                        }
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(8)
-                                    }
-
-                                    Text(fragment.name)
-                                        .font(.subheadline)
-                                        .foregroundColor(.white)
-                                        .lineLimit(2)
-
-                                    Spacer()
-
-                                    Image(systemName: "play.circle")
-                                        .foregroundColor(.transistorGreen)
-                                        .font(.title3)
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
+                    // Onderwerpen (topics) of fallback beschrijving
+                    TopicsSectionView(
+                        topics: detail.topics,
+                        description: detail.description,
+                        onPlayTopic: nil
+                    )
                 }
                 .padding(.vertical)
             } else {

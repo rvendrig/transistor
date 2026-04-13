@@ -334,6 +334,13 @@ class NPOAPIService {
             .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Parse topics from description + fragments
+        let topics = Self.parseTopics(
+            rawHTML: description,
+            fragments: fragments,
+            presenters: presenters
+        )
+
         return NPOBroadcastDetail(
             name: name ?? "",
             description: cleanDescription,
@@ -344,8 +351,206 @@ class NPOAPIService {
             programmeUrl: programmeUrl,
             isRecording: recording,
             listenBackUrl: listenBackUrl,
-            fragments: fragments
+            fragments: fragments,
+            topics: topics
         )
+    }
+
+    // MARK: - Topic Extraction
+
+    private static let roleWords = [
+        "journalist", "commissaris", "directeur", "minister", "professor",
+        "presentator", "correspondent", "verslaggever", "schrijver", "auteur"
+    ]
+
+    private static let actionPatterns = [
+        "licht toe", "schuift aan", "vertelt", "legt uit", "reageert"
+    ]
+
+    static func parseTopics(rawHTML: String?, fragments: [NPOFragment], presenters: [String]) -> [BroadcastTopic] {
+        guard let html = rawHTML, !html.isEmpty else { return [] }
+
+        // Split on <p> tags to get topic blocks
+        let blocks = html.components(separatedBy: "<p>")
+            .map { block in
+                block.replacingOccurrences(of: "</p>", with: "")
+                    .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty }
+
+        guard blocks.count > 1 else {
+            // Single block or no structure: one topic from the full text
+            let fullText = html
+                .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !fullText.isEmpty else { return [] }
+            let guests = extractGuests(from: fullText, excludingPresenters: presenters)
+            let matchedFragment = matchFragment(text: fullText, fragments: fragments)
+            return [BroadcastTopic(
+                title: extractTitle(from: fullText),
+                description: fullText,
+                guests: guests,
+                imageUrl: matchedFragment?.imageUrl,
+                fragmentUrl: matchedFragment?.url
+            )]
+        }
+
+        var topics: [BroadcastTopic] = []
+        var usedFragmentIds = Set<String>()
+
+        for block in blocks {
+            let title = extractTitle(from: block)
+            let desc = block.count > title.count
+                ? String(block.dropFirst(title.count)).trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+                : nil
+            let guests = extractGuests(from: block, excludingPresenters: presenters)
+            let matchedFragment = matchFragment(text: block, fragments: fragments.filter { !usedFragmentIds.contains($0.id) })
+            if let frag = matchedFragment {
+                usedFragmentIds.insert(frag.id)
+            }
+
+            topics.append(BroadcastTopic(
+                title: title,
+                description: desc?.isEmpty == true ? nil : desc,
+                guests: guests,
+                imageUrl: matchedFragment?.imageUrl,
+                fragmentUrl: matchedFragment?.url
+            ))
+        }
+
+        return topics
+    }
+
+    private static func extractTitle(from text: String) -> String {
+        // First sentence = up to first period (but at least 10 chars to avoid abbreviations)
+        if let dotRange = text.range(of: ".", range: text.index(text.startIndex, offsetBy: min(10, text.count))..<text.endIndex) {
+            let candidate = String(text[text.startIndex...dotRange.lowerBound])
+            if candidate.count <= 200 {
+                return candidate
+            }
+        }
+        // Fallback: first 100 chars
+        if text.count > 100 {
+            return String(text.prefix(100)) + "..."
+        }
+        return text
+    }
+
+    private static func extractGuests(from text: String, excludingPresenters presenters: [String]) -> [String] {
+        var guests = Set<String>()
+        let lowText = text.lowercased()
+        let presenterLower = Set(presenters.map { $0.lowercased() })
+
+        // Pattern 1: role word followed by capitalized names
+        // e.g. "journalist Jan de Vries"
+        for role in roleWords {
+            var searchRange = lowText.startIndex..<lowText.endIndex
+            while let range = lowText.range(of: role, range: searchRange) {
+                // Look at original text after the role word
+                let afterRole = text[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if let name = extractCapitalizedName(from: afterRole) {
+                    if !presenterLower.contains(name.lowercased()) {
+                        guests.insert(name)
+                    }
+                }
+                searchRange = range.upperBound..<lowText.endIndex
+            }
+        }
+
+        // Pattern 2: name before action words
+        // e.g. "Jan de Vries licht toe"
+        for action in actionPatterns {
+            var searchRange = lowText.startIndex..<lowText.endIndex
+            while let range = lowText.range(of: action, range: searchRange) {
+                // Look backwards in original text for capitalized name
+                let beforeAction = String(text[text.startIndex..<range.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+                if let name = extractCapitalizedNameBackwards(from: beforeAction) {
+                    if !presenterLower.contains(name.lowercased()) {
+                        guests.insert(name)
+                    }
+                }
+                searchRange = range.upperBound..<lowText.endIndex
+            }
+        }
+
+        return Array(guests).sorted()
+    }
+
+    private static func extractCapitalizedName(from text: String) -> String? {
+        // Extract "FirstName LastName" or "FirstName de/van/den LastName"
+        let words = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        guard !words.isEmpty else { return nil }
+
+        var nameParts: [String] = []
+        let particles = Set(["de", "van", "den", "der", "het", "ten", "ter", "op"])
+
+        for word in words {
+            let clean = word.trimmingCharacters(in: .punctuationCharacters)
+            if clean.isEmpty { break }
+            let first = clean.first!
+            if first.isUppercase {
+                nameParts.append(clean)
+            } else if particles.contains(clean.lowercased()) && !nameParts.isEmpty {
+                nameParts.append(clean)
+            } else if !nameParts.isEmpty {
+                break
+            } else {
+                break
+            }
+        }
+
+        // Need at least two parts for a real name (or one part + particle + part)
+        let capitalCount = nameParts.filter { $0.first?.isUppercase == true }.count
+        guard capitalCount >= 2 else { return nil }
+        return nameParts.joined(separator: " ")
+    }
+
+    private static func extractCapitalizedNameBackwards(from text: String) -> String? {
+        let words = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        guard words.count >= 2 else { return nil }
+
+        var nameParts: [String] = []
+        let particles = Set(["de", "van", "den", "der", "het", "ten", "ter", "op"])
+
+        for word in words.reversed() {
+            let clean = word.trimmingCharacters(in: .punctuationCharacters)
+            if clean.isEmpty { break }
+            let first = clean.first!
+            if first.isUppercase {
+                nameParts.insert(clean, at: 0)
+            } else if particles.contains(clean.lowercased()) && !nameParts.isEmpty {
+                nameParts.insert(clean, at: 0)
+            } else if !nameParts.isEmpty {
+                break
+            } else {
+                break
+            }
+        }
+
+        let capitalCount = nameParts.filter { $0.first?.isUppercase == true }.count
+        guard capitalCount >= 2 else { return nil }
+        return nameParts.joined(separator: " ")
+    }
+
+    private static func matchFragment(text: String, fragments: [NPOFragment]) -> NPOFragment? {
+        let lowText = text.lowercased()
+        // Check if any fragment name appears in the topic text
+        for fragment in fragments {
+            let fragName = fragment.name.lowercased()
+            if lowText.contains(fragName) || fragName.contains(lowText.prefix(40).lowercased()) {
+                return fragment
+            }
+            // Also try matching significant words (3+ chars)
+            let fragWords = fragName.components(separatedBy: .whitespaces)
+                .filter { $0.count >= 4 }
+            let matchCount = fragWords.filter { lowText.contains($0) }.count
+            if fragWords.count > 0 && matchCount >= max(1, fragWords.count / 2) {
+                return fragment
+            }
+        }
+        return nil
     }
 
     private func parseBroadcastList(html: String) -> [NPOBroadcastListItem] {
@@ -513,6 +718,14 @@ struct NPOTrackAPI: Codable {
 
 // MARK: - Broadcast Detail (scraped from uitzendingen pages)
 
+struct BroadcastTopic {
+    let title: String
+    let description: String?
+    let guests: [String]
+    let imageUrl: String?
+    let fragmentUrl: String?
+}
+
 struct NPOBroadcastDetail {
     let name: String
     let description: String?
@@ -524,6 +737,7 @@ struct NPOBroadcastDetail {
     let isRecording: Bool
     let listenBackUrl: String?
     let fragments: [NPOFragment]
+    let topics: [BroadcastTopic]
 }
 
 struct NPOFragment {
