@@ -35,6 +35,8 @@ class AudioPlayerService: NSObject, ObservableObject {
     @Published var currentImageUrl: String?
     @Published var isLiveStream = false
     @Published var currentSource: String?
+    @Published var currentBroadcast: Broadcast?
+    @Published var currentChannelId: String?
 
     private let dbService = DatabaseService.shared
     private var currentSessionId: String?
@@ -52,19 +54,23 @@ class AudioPlayerService: NSObject, ObservableObject {
         startSession(title: content.title, source: content.providerId, contentType: content.contentType, duration: content.duration)
     }
 
-    func playLive(url: String, title: String, imageUrl: String? = nil, source: String = "npo") async {
+    func playLive(url: String, title: String, imageUrl: String? = nil, source: String = "npo", broadcast: Broadcast? = nil, channelId: String? = nil) async {
         currentTitle = title
         currentImageUrl = imageUrl
         currentSource = source
+        currentBroadcast = broadcast
+        currentChannelId = channelId
         isLiveStream = true
         await playURL(url)
         startSession(title: title, source: source, contentType: .stream, duration: 0)
     }
 
-    func playOnDemand(url: String, title: String, imageUrl: String? = nil, source: String = "npo") async {
+    func playOnDemand(url: String, title: String, imageUrl: String? = nil, source: String = "npo", broadcast: Broadcast? = nil, channelId: String? = nil) async {
         currentTitle = title
         currentImageUrl = imageUrl
         currentSource = source
+        currentBroadcast = broadcast
+        currentChannelId = channelId
         isLiveStream = false
         await playURL(url)
         startSession(title: title, source: source, contentType: .broadcast, duration: Int(duration))
@@ -151,6 +157,8 @@ class AudioPlayerService: NSObject, ObservableObject {
         currentTitle = nil
         currentImageUrl = nil
         currentSource = nil
+        currentBroadcast = nil
+        currentChannelId = nil
     }
 
     func seek(to seconds: Double) {

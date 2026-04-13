@@ -8,6 +8,8 @@ struct BrowseView: View {
     @State private var isLoadingPodcast = false
     @State private var podcastError: String?
     @State private var channelConfigMap: [String: ChannelConfig] = [:]
+    @State private var navigateBroadcast: Broadcast?
+    @State private var navigateChannelId: String = ""
 
     /// Channels grouped by networkId, with the provider name as key
     private var channelsByNetwork: [(networkName: String, channels: [Channel])] {
@@ -197,6 +199,19 @@ struct BrowseView: View {
                 Task {
                     await viewModel.loadChannels()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToBroadcast)) { notification in
+                if let broadcast = notification.userInfo?["broadcast"] as? Broadcast,
+                   let channelId = notification.userInfo?["channelId"] as? String {
+                    navigateChannelId = channelId
+                    navigateBroadcast = broadcast
+                }
+            }
+            .sheet(item: $navigateBroadcast) { broadcast in
+                NavigationStack {
+                    BroadcastDetailView(broadcast: broadcast, channelId: navigateChannelId)
+                }
+                .environmentObject(AudioPlayerService.shared)
             }
         }
     }
@@ -734,7 +749,9 @@ struct BroadcastDetailView: View {
                         await audioPlayer.playLive(
                             url: streamUrl,
                             title: broadcast.displayTitle,
-                            imageUrl: detail?.imageUrl ?? broadcast.image
+                            imageUrl: detail?.imageUrl ?? broadcast.image,
+                            broadcast: broadcast,
+                            channelId: channelId
                         )
                     }
                 }
@@ -758,7 +775,9 @@ struct BroadcastDetailView: View {
                         await audioPlayer.playOnDemand(
                             url: listenBackUrl,
                             title: broadcast.displayTitle,
-                            imageUrl: detail?.imageUrl ?? broadcast.image
+                            imageUrl: detail?.imageUrl ?? broadcast.image,
+                            broadcast: broadcast,
+                            channelId: channelId
                         )
                     }
                 }) {

@@ -293,6 +293,26 @@ struct FullPlayerView: View {
 
             Spacer()
 
+            // Link to broadcast detail
+            if let broadcast = player.currentBroadcast {
+                Button(action: {
+                    dismiss()
+                    // Post notification to navigate to broadcast detail
+                    NotificationCenter.default.post(
+                        name: .navigateToBroadcast,
+                        object: nil,
+                        userInfo: ["broadcast": broadcast, "channelId": player.currentChannelId ?? ""]
+                    )
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                        Text("Bekijk uitzending")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.transistorGreen)
+                }
+            }
+
             // Stop button
             Button(action: {
                 player.stop()
@@ -315,6 +335,12 @@ struct FullPlayerView: View {
         }
         return String(format: "%d:%02d", total / 60, total % 60)
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let navigateToBroadcast = Notification.Name("navigateToBroadcast")
 }
 
 // MARK: - Color Extension
