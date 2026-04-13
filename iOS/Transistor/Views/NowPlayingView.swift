@@ -394,41 +394,8 @@ struct NowPlayingView: View {
                             .padding(.horizontal)
 
                         ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                            HStack(spacing: 12) {
-                                if let imageUrl = track.image_url_200x200, let url = URL(string: imageUrl) {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Rectangle().fill(Color.cardBg)
-                                    }
-                                    .frame(width: 44, height: 44)
-                                    .cornerRadius(6)
-                                } else {
-                                    Image(systemName: "music.note")
-                                        .frame(width: 44, height: 44)
-                                        .background(Color.cardBg)
-                                        .cornerRadius(6)
-                                        .foregroundColor(.gray)
-                                }
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(track.title ?? "Onbekend")
-                                        .font(.subheadline)
-                                        .foregroundColor(.white)
-                                    Text(track.artist ?? "Onbekend")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-
-                                Spacer()
-
-                                if let start = track.startdatetime, let parsed = parseTime(start) {
-                                    Text(timeFormatter.string(from: parsed))
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                            .padding(.horizontal)
+                            TrackRowView(track: track, timeFormatter: timeFormatter)
+                                .padding(.horizontal)
                         }
                     }
                     .padding(.top, 8)
@@ -590,5 +557,102 @@ struct NowPlayingView: View {
             return String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
         }
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+// MARK: - Track Row (herbruikbaar, met Klassiek metadata)
+
+struct TrackRowView: View {
+    let track: NPOTrackAPI
+    let timeFormatter: DateFormatter
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Artwork
+            let imgUrl = track.image_url_200x200 ?? track.image_url_400x400
+            if let imageUrl = imgUrl, let url = URL(string: imageUrl) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle().fill(Color.cardBg)
+                }
+                .frame(width: 50, height: 50)
+                .cornerRadius(6)
+            } else {
+                Image(systemName: "music.note")
+                    .frame(width: 50, height: 50)
+                    .background(Color.cardBg)
+                    .cornerRadius(6)
+                    .foregroundColor(.gray)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                // Titel
+                Text(track.title ?? "Onbekend")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+
+                // Artiest / componist
+                if track.isClassical {
+                    if let composer = track.composer_name ?? track.composer {
+                        Text(composer)
+                            .font(.caption)
+                            .foregroundColor(.transistorGreen)
+                    }
+                    if let soloists = track.soloistsEnsemble, !soloists.isEmpty {
+                        Text(soloists)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                    }
+                    if let orchestra = track.orchestra, !orchestra.isEmpty {
+                        Text(orchestra)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                    }
+                    if let director = track.director, !director.isEmpty {
+                        Text("dir. \(director)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    if let label = track.label, !label.isEmpty {
+                        Text(label)
+                            .font(.caption2)
+                            .foregroundColor(.gray.opacity(0.7))
+                    }
+                } else {
+                    Text(track.artist ?? "Onbekend")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                if let start = track.startdatetime, let parsed = parseTime(start) {
+                    Text(timeFormatter.string(from: parsed))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+
+                if let spotifyUrl = track.spotify_url, let url = URL(string: spotifyUrl) {
+                    Link(destination: url) {
+                        Image(systemName: "link")
+                            .font(.caption2)
+                            .foregroundColor(.transistorGreen)
+                    }
+                }
+            }
+        }
+    }
+
+    private func parseTime(_ str: String) -> Date? {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f.date(from: str)
     }
 }

@@ -923,41 +923,8 @@ struct BroadcastDetailView: View {
                 .padding(.horizontal)
 
             ForEach(Array(tracks.enumerated()), id: \.offset) { _, track in
-                HStack(spacing: 12) {
-                    if let imageUrl = track.image_url_200x200, let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle().fill(Color.cardBg)
-                        }
-                        .frame(width: 44, height: 44)
-                        .cornerRadius(6)
-                    } else {
-                        Image(systemName: "music.note")
-                            .frame(width: 44, height: 44)
-                            .background(Color.cardBg)
-                            .cornerRadius(6)
-                            .foregroundColor(.gray)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(track.title ?? "Onbekend")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                        Text(track.artist ?? "Onbekend")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-
-                    Spacer()
-
-                    if let start = track.startdatetime, let parsed = parseTime(start) {
-                        Text(timeFormatter.string(from: parsed))
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .padding(.horizontal)
+                TrackRowView(track: track, timeFormatter: timeFormatter)
+                    .padding(.horizontal)
             }
         }
         .padding(.top, 8)

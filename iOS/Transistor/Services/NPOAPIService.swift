@@ -467,8 +467,23 @@ struct NPOTrackAPI: Codable {
     let title: String?
     let startdatetime: String?
     let enddatetime: String?
+    let stopdatetime: String?
     let image_url_200x200: String?
+    let image_url_400x400: String?
     let spotify_url: String?
+    // Klassiek extra velden
+    let composer: String?
+    let composer_name: String?
+    let soloistsEnsemble: String?
+    let orchestra: String?
+    let director: String?
+    let label: String?
+    let labelcatalognr: String?
+    let description: String?
+
+    var isClassical: Bool {
+        composer != nil || orchestra != nil || director != nil
+    }
 }
 
 // MARK: - Broadcast Detail (scraped from uitzendingen pages)
