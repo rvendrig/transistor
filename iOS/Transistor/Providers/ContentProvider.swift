@@ -1,5 +1,36 @@
 import Foundation
 
+// MARK: - Channel Capabilities
+
+enum ChannelCapability: String, Codable {
+    case liveStream
+    case schedule
+    case listenBack
+    case fragments
+    case tracks
+    case podcast
+}
+
+enum StreamFormat: String, Codable {
+    case mp3, aac, hls
+}
+
+struct ChannelConfig {
+    let id: String
+    let name: String
+    let description: String
+    let networkId: String
+    let logo: String?
+    let timezone: TimeZone
+    let liveStreamUrl: String?
+    let liveStreamFormat: StreamFormat
+    let capabilities: Set<ChannelCapability>
+    let broadcastsApiUrl: String?
+    let tracksApiUrl: String?
+    let listenBackBaseUrl: String?
+    let podcastFeedUrl: String?
+}
+
 // MARK: - Provider Protocol
 
 protocol ContentProvider {
@@ -16,6 +47,7 @@ protocol ContentProvider {
     func fetchBroadcasts(forChannel channelId: String) async throws -> [Broadcast]
     func fetchSegments(forBroadcast broadcastId: String) async throws -> [Segment]
     func search(_ query: String) async throws -> [any AudioContent]
+    func channelConfigs() -> [ChannelConfig]
 }
 
 // Default implementations — not every provider has every level
@@ -24,6 +56,7 @@ extension ContentProvider {
     func fetchSeasons(forShow showId: String) async throws -> [Season] { [] }
     func fetchBroadcasts(forChannel channelId: String) async throws -> [Broadcast] { [] }
     func fetchSegments(forBroadcast broadcastId: String) async throws -> [Segment] { [] }
+    func channelConfigs() -> [ChannelConfig] { [] }
 }
 
 // MARK: - Provider Types

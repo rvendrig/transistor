@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1263FDDB023A0D52440B5B91 /* ContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93603E59A3CF17057CA1E97E /* ContentProvider.swift */; };
+		14BCF729212065E1C5FA5AD6 /* TalpaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D1507ACA2FAB2E5E0255DF0 /* TalpaProvider.swift */; };
 		1DD5E72BC9748EA9CF4419D6 /* TransistorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1E388A80A81DA7ECB8AA5F /* TransistorApp.swift */; };
 		27790E695C1EC27D54772663 /* BBCProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D351D48A1D78269FDA0ED7FC /* BBCProvider.swift */; };
 		2AA91FB4B662B77F8EDD374C /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C3935C4662F87E7993A7022 /* AudioPlayerService.swift */; };
@@ -65,6 +66,7 @@
 		93603E59A3CF17057CA1E97E /* ContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentProvider.swift; sourceTree = "<group>"; };
 		99309D56701ED7DDB6A6579A /* NPOItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOItemDetailView.swift; sourceTree = "<group>"; };
 		9AC9AF6C1D4E2FE5795DCF2F /* PlaybackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackView.swift; sourceTree = "<group>"; };
+		9D1507ACA2FAB2E5E0255DF0 /* TalpaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalpaProvider.swift; sourceTree = "<group>"; };
 		AF8CF7C80C2D547F31E5086D /* NPOAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOAPIService.swift; sourceTree = "<group>"; };
 		B055A7E0D5846B379EB6C85F /* AddToPlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToPlaylistView.swift; sourceTree = "<group>"; };
 		B433353F6F7CFAE2D100F438 /* ContentConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentConfiguration.swift; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@
 				93603E59A3CF17057CA1E97E /* ContentProvider.swift */,
 				B815790244BD61BEC25BEEE2 /* NPOProvider.swift */,
 				4B50974D638DDA79A94A5CAB /* PodcastFeedProvider.swift */,
+				9D1507ACA2FAB2E5E0255DF0 /* TalpaProvider.swift */,
 			);
 			path = Providers;
 			sourceTree = "<group>";
@@ -275,6 +278,7 @@
 				F76E8712E970DA7CA78AFAAF /* ScheduleModels.swift in Sources */,
 				A97CF357FCAC065F1DD429F3 /* SearchView.swift in Sources */,
 				E56E1DDF3D8088FF92E9565A /* SettingsView.swift in Sources */,
+				14BCF729212065E1C5FA5AD6 /* TalpaProvider.swift in Sources */,
 				1DD5E72BC9748EA9CF4419D6 /* TransistorApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

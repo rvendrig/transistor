@@ -20,19 +20,98 @@ class NPOProvider: ContentProvider {
     private let apiService = NPOAPIService.shared
     private let mockDataService = NPODataService.shared
 
+    // swiftlint:disable:next identifier_name
+    private let ams = TimeZone(identifier: "Europe/Amsterdam")!
+
+    // MARK: - Channel Configs
+
+    func channelConfigs() -> [ChannelConfig] {
+        let fullCapabilities: Set<ChannelCapability> = [.liveStream, .schedule, .listenBack, .fragments, .tracks, .podcast]
+
+        return [
+            ChannelConfig(
+                id: "radio1", name: "NPO Radio 1",
+                description: "Nieuws, sport en achtergronden",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: "https://icecast.omroep.nl/radio1-bb-mp3",
+                liveStreamFormat: .mp3, capabilities: fullCapabilities,
+                broadcastsApiUrl: "https://www.nporadio1.nl/api/broadcasts",
+                tracksApiUrl: "https://www.nporadio1.nl/api/tracks",
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+            ChannelConfig(
+                id: "radio2", name: "NPO Radio 2",
+                description: "Het beste van popmuziek",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: "https://icecast.omroep.nl/radio2-bb-mp3",
+                liveStreamFormat: .mp3, capabilities: fullCapabilities,
+                broadcastsApiUrl: "https://www.nporadio2.nl/api/broadcasts",
+                tracksApiUrl: "https://www.nporadio2.nl/api/tracks",
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+            ChannelConfig(
+                id: "3fm", name: "NPO 3FM",
+                description: "De nieuwste muziek",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: "https://icecast.omroep.nl/3fm-bb-mp3",
+                liveStreamFormat: .mp3, capabilities: fullCapabilities,
+                broadcastsApiUrl: "https://www.npo3fm.nl/api/broadcasts",
+                tracksApiUrl: "https://www.npo3fm.nl/api/tracks",
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+            ChannelConfig(
+                id: "radio4", name: "NPO Klassiek",
+                description: "Klassieke muziek",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: "https://icecast.omroep.nl/radio4-bb-mp3",
+                liveStreamFormat: .mp3, capabilities: fullCapabilities,
+                broadcastsApiUrl: "https://www.npoklassiek.nl/api/broadcasts",
+                tracksApiUrl: "https://www.npoklassiek.nl/api/tracks",
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+            ChannelConfig(
+                id: "radio5", name: "NPO Radio 5",
+                description: "Muziek uit de jaren 60, 70 en 80",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: "https://icecast.omroep.nl/radio5-bb-mp3",
+                liveStreamFormat: .mp3, capabilities: fullCapabilities,
+                broadcastsApiUrl: "https://www.nporadio5.nl/api/broadcasts",
+                tracksApiUrl: "https://www.nporadio5.nl/api/tracks",
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+            ChannelConfig(
+                id: "funx", name: "FunX",
+                description: "Urban, hiphop, R&B en dance",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: "https://icecast.omroep.nl/funx-bb-mp3",
+                liveStreamFormat: .mp3, capabilities: fullCapabilities,
+                broadcastsApiUrl: "https://www.funx.nl/api/broadcasts",
+                tracksApiUrl: "https://www.funx.nl/api/tracks",
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+            ChannelConfig(
+                id: "soulnjazz", name: "NPO Soul & Jazz",
+                description: "Soul, jazz en funk",
+                networkId: "npo", logo: nil, timezone: ams,
+                liveStreamUrl: nil,
+                liveStreamFormat: .mp3, capabilities: [.schedule],
+                broadcastsApiUrl: nil,
+                tracksApiUrl: nil,
+                listenBackBaseUrl: nil, podcastFeedUrl: nil
+            ),
+        ]
+    }
+
     // MARK: - Channel Fetching
     func fetchChannels() async throws -> [Channel] {
-        // Use existing mock data for channels
-        let npoChannels = mockDataService.getAllChannels()
-
-        return npoChannels.map { npoChannel in
+        return channelConfigs().map { config in
             Channel(
-                id: npoChannel.id,
+                id: config.id,
                 providerId: id,
-                networkId: "npo",
-                titles: [TitledPeriod(title: npoChannel.name)],
-                description: npoChannel.description,
-                logo: npoChannel.logoURL
+                networkId: config.networkId,
+                titles: [TitledPeriod(title: config.name)],
+                description: config.description,
+                logo: config.logo
             )
         }
     }

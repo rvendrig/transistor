@@ -7,7 +7,7 @@ struct TransistorApp: App {
 
     init() {
         ProviderStore.shared.registerProvider(NPOProvider())
-        ProviderStore.shared.registerProvider(BBCProvider())
+        ProviderStore.shared.registerProvider(TalpaProvider())
     }
 
     var body: some Scene {

@@ -7,6 +7,32 @@ struct BrowseView: View {
     @State private var podcastURL = ""
     @State private var isLoadingPodcast = false
     @State private var podcastError: String?
+    @State private var channelConfigMap: [String: ChannelConfig] = [:]
+
+    /// Channels grouped by networkId, with the provider name as key
+    private var channelsByNetwork: [(networkName: String, channels: [Channel])] {
+        let grouped = Dictionary(grouping: viewModel.channels, by: { $0.networkId })
+        let store = ProviderStore.shared
+
+        // Build ordered list: use provider name as section title
+        var result: [(String, [Channel])] = []
+        for provider in store.allActiveProviders() {
+            let networkId = provider.id  // networkId matches provider id
+            if let channels = grouped[networkId], !channels.isEmpty {
+                result.append((provider.name, channels))
+            }
+        }
+        // Any remaining networks not matched to a provider
+        let coveredIds = Set(result.flatMap { $0.1.map { $0.networkId } })
+        for (networkId, channels) in grouped where !coveredIds.contains(networkId) {
+            result.append((networkId, channels))
+        }
+        return result
+    }
+
+    private func hasCapability(_ channelId: String, _ capability: ChannelCapability) -> Bool {
+        channelConfigMap[channelId]?.capabilities.contains(capability) ?? false
+    }
 
     var body: some View {
         NavigationStack {
@@ -29,38 +55,32 @@ struct BrowseView: View {
                             .padding()
                         }
 
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            ForEach(Array(viewModel.channels.enumerated()), id: \.element.id) { index, channel in
-                                NavigationLink(value: channel) {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(channel.currentTitle)
-                                            .font(.headline)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white)
-                                        Text(channel.description)
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                            .lineLimit(2)
-                                        Spacer()
+                        ForEach(channelsByNetwork, id: \.networkName) { section in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(section.networkName)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal)
+
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                    ForEach(Array(section.channels.enumerated()), id: \.element.id) { index, channel in
+                                        Group {
+                                            if hasCapability(channel.id, .schedule) {
+                                                NavigationLink(value: channel) {
+                                                    channelCard(channel: channel, index: index, total: section.channels.count)
+                                                }
+                                            } else {
+                                                NavigationLink(destination: LiveOnlyChannelView(channel: channel, config: channelConfigMap[channel.id])) {
+                                                    channelCard(channel: channel, index: index, total: section.channels.count)
+                                                }
+                                            }
+                                        }
                                     }
-                                    .frame(height: 100)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding()
-                                    .background(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [
-                                                Color(hue: Double(index) / max(Double(viewModel.channels.count), 1), saturation: 0.7, brightness: 0.5),
-                                                Color(hue: Double(index) / max(Double(viewModel.channels.count), 1), saturation: 0.7, brightness: 0.3),
-                                            ]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .cornerRadius(12)
                                 }
+                                .padding(.horizontal)
                             }
                         }
-                        .padding(.horizontal)
                     }
 
                     // MARK: Podcasts sectie
@@ -165,11 +185,104 @@ struct BrowseView: View {
                 )
             }
             .onAppear {
+                // Populate channel config map from all providers
+                var configs: [String: ChannelConfig] = [:]
+                for provider in ProviderStore.shared.allActiveProviders() {
+                    for config in provider.channelConfigs() {
+                        configs[config.id] = config
+                    }
+                }
+                channelConfigMap = configs
+
                 Task {
                     await viewModel.loadChannels()
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func channelCard(channel: Channel, index: Int, total: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(channel.currentTitle)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+            Text(channel.description)
+                .font(.caption)
+                .foregroundColor(.gray)
+                .lineLimit(2)
+            Spacer()
+        }
+        .frame(height: 100)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(hue: Double(index) / max(Double(total), 1), saturation: 0.7, brightness: 0.5),
+                    Color(hue: Double(index) / max(Double(total), 1), saturation: 0.7, brightness: 0.3),
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Live-only channel (geen programma-informatie)
+
+struct LiveOnlyChannelView: View {
+    let channel: Channel
+    let config: ChannelConfig?
+    @EnvironmentObject var audioPlayer: AudioPlayerService
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 60))
+                .foregroundColor(.transistorGreen)
+
+            Text(channel.currentTitle)
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+
+            Text(channel.description)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+
+            if let streamUrl = config?.liveStreamUrl {
+                Button(action: {
+                    Task {
+                        await audioPlayer.playLive(
+                            url: streamUrl,
+                            title: channel.currentTitle,
+                            imageUrl: channel.logo
+                        )
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                        Text("Luister live")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 14)
+                    .background(Color.transistorGreen)
+                    .cornerRadius(25)
+                }
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.darkBg)
+        .navigationTitle(channel.currentTitle)
     }
 }
 
