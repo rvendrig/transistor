@@ -16,6 +16,9 @@ struct NowPlayingView: View {
         return f
     }()
 
+    private var broadcast: Broadcast? { player.currentBroadcast }
+    private var channelId: String { player.currentChannelId ?? "" }
+
     var body: some View {
         VStack(spacing: 0) {
             // Sticky compact transport bar (verschijnt bij scrollen)
@@ -29,13 +32,22 @@ struct NowPlayingView: View {
                     // === PLAYER SECTIE ===
                     playerSection
 
-                    // === DETAIL SECTIE ===
-                    if player.currentBroadcast != nil {
-                        Divider()
-                            .background(Color.gray.opacity(0.3))
-                            .padding(.horizontal)
+                    // === DETAIL SECTIE (altijd tonen als broadcast bekend) ===
+                    Divider()
+                        .background(Color.gray.opacity(0.3))
+                        .padding(.horizontal)
 
+                    if broadcast != nil {
                         detailSection
+                    } else if detail != nil {
+                        // Detail geladen maar geen broadcast-object (bijv. via fragment)
+                        detailSection
+                    } else if isLoadingDetail {
+                        HStack {
+                            ProgressView().tint(.transistorGreen)
+                            Text("Details laden...").foregroundColor(.gray).font(.caption)
+                        }
+                        .padding()
                     }
 
                     // Stop
@@ -60,6 +72,10 @@ struct NowPlayingView: View {
         }
         .background(Color.darkBg)
         .onAppear {
+            Task { await loadDetail() }
+        }
+        .onChange(of: player.currentBroadcast) {
+            // Herlaad detail als de broadcast verandert
             Task { await loadDetail() }
         }
     }
@@ -493,12 +509,27 @@ struct NowPlayingView: View {
     private func loadBroadcastDetail(channelId: String, broadcast: Broadcast) async {
         do {
             let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
-            if let match = list.first(where: { $0.title.hasPrefix(broadcast.displayTitle) }) {
+            let title = broadcast.displayTitle.lowercased()
+
+            // Match: hasPrefix, contains, of eerste woord
+            let match = list.first(where: { $0.title.lowercased().hasPrefix(title) })
+                ?? list.first(where: { $0.title.lowercased().contains(title) })
+                ?? list.first(where: { title.contains($0.title.lowercased()) })
+                ?? list.first(where: {
+                    // Match op eerste woord
+                    let firstWord = title.components(separatedBy: " ").first ?? ""
+                    return firstWord.count > 3 && $0.title.lowercased().contains(firstWord)
+                })
+
+            if let match {
                 detail = try await NPOAPIService.shared.fetchBroadcastDetail(
                     forChannel: channelId,
                     broadcastUrl: match.url
                 )
-                broadcastList = list.filter { $0.title != match.title }
+                broadcastList = list.filter { $0.url != match.url }
+            } else {
+                // Geen match gevonden — toon de lijst als "andere uitzendingen"
+                broadcastList = list
             }
         } catch {
             print("Error loading broadcast detail: \(error)")

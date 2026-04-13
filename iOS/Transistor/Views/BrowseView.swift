@@ -1039,14 +1039,24 @@ struct BroadcastDetailView: View {
         // First get the broadcast list to find the URL for this broadcast
         do {
             let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
-            // Match by title
-            if let match = list.first(where: { $0.title.hasPrefix(broadcast.displayTitle) }) {
+            let title = broadcast.displayTitle.lowercased()
+
+            let match = list.first(where: { $0.title.lowercased().hasPrefix(title) })
+                ?? list.first(where: { $0.title.lowercased().contains(title) })
+                ?? list.first(where: { title.contains($0.title.lowercased()) })
+                ?? list.first(where: {
+                    let firstWord = title.components(separatedBy: " ").first ?? ""
+                    return firstWord.count > 3 && $0.title.lowercased().contains(firstWord)
+                })
+
+            if let match {
                 detail = try await NPOAPIService.shared.fetchBroadcastDetail(
                     forChannel: channelId,
                     broadcastUrl: match.url
                 )
-                // Also store the list for "andere uitzendingen"
-                broadcastList = list.filter { $0.title != match.title }
+                broadcastList = list.filter { $0.url != match.url }
+            } else {
+                broadcastList = list
             }
         } catch {
             print("Error loading broadcast detail: \(error)")
