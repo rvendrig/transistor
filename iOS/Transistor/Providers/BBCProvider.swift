@@ -27,14 +27,9 @@ class BBCProvider: ContentProvider {
         ("bbc_6music", "BBC 6 Music", "Alternative music")
     ]
 
-    static let streamURLs: [String: String] = [
-        "bbc_radio_one": "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_one",
-        "bbc_radio_two": "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_two",
-        "bbc_radio_three": "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_three",
-        "bbc_radio_fourfm": "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_fourfm",
-        "bbc_radio_five_live": "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_five_live",
-        "bbc_6music": "https://stream.live.vc.bbcmedia.co.uk/bbc_6music"
-    ]
+    // NOTE: BBC streams are geo-restricted to the UK
+    // Schedule data works internationally, but audio playback requires UK location
+    static let streamURLs: [String: String] = [:]
 
     init() {
         let config = URLSessionConfiguration.default
