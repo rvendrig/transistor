@@ -323,18 +323,33 @@ struct BrowseScheduleView: View {
         return f
     }()
 
-    // Shortcuts: nieuws, weer, verkeer uitzendingen herkennen aan titel
-    var shortcuts: [(icon: String, label: String, broadcast: Broadcast?)] {
-        let news = broadcasts.last(where: { isShortcutMatch($0, keywords: ["journaal", "nieuws", "nos"]) })
+    enum ShortcutAction {
+        case broadcast(Broadcast)
+        case journaalBulletin // NOS Journaal: seek naar dichtstbijzijnde uur
+    }
+
+    var shortcuts: [(icon: String, label: String, action: ShortcutAction)] {
+        var result: [(String, String, ShortcutAction)] = []
+
+        // NOS Journaal shortcut (alleen Radio 1)
+        if channel.id == "radio1" {
+            let journaal = broadcasts.first(where: { isShortcutMatch($0, keywords: ["journaal"]) })
+            if journaal != nil {
+                result.append(("newspaper", "Nieuws", .journaalBulletin))
+            }
+        }
+
+        // Reguliere shortcuts
         let weather = broadcasts.last(where: { isShortcutMatch($0, keywords: ["weer", "weerbericht"]) })
         let traffic = broadcasts.last(where: { isShortcutMatch($0, keywords: ["verkeer", "anwb", "file"]) })
 
-        var result: [(String, String, Broadcast?)] = []
-        if news != nil { result.append(("newspaper", "Nieuws", news)) }
-        if weather != nil { result.append(("cloud.sun", "Weer", weather)) }
-        if traffic != nil { result.append(("car", "Verkeer", traffic)) }
+        if let weather { result.append(("cloud.sun", "Weer", .broadcast(weather))) }
+        if let traffic { result.append(("car", "Verkeer", .broadcast(traffic))) }
         return result
     }
+
+    @EnvironmentObject var audioPlayer: AudioPlayerService
+    @State private var isLoadingJournaal = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -377,23 +392,17 @@ struct BrowseScheduleView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(shortcuts, id: \.label) { shortcut in
-                            if let broadcast = shortcut.broadcast {
+                            switch shortcut.action {
+                            case .broadcast(let broadcast):
                                 NavigationLink(value: broadcast) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: shortcut.icon)
-                                            .font(.caption)
-                                        Text(shortcut.label)
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(Color.cardBg)
-                                    .cornerRadius(20)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 20)
-                                            .stroke(Color.transistorGreen.opacity(0.5), lineWidth: 1)
+                                    shortcutPill(icon: shortcut.icon, label: shortcut.label)
+                                }
+                            case .journaalBulletin:
+                                Button(action: { playNearestJournaalBulletin() }) {
+                                    shortcutPill(
+                                        icon: isLoadingJournaal ? nil : shortcut.icon,
+                                        label: shortcut.label,
+                                        showSpinner: isLoadingJournaal
                                     )
                                 }
                             }
@@ -486,9 +495,106 @@ struct BrowseScheduleView: View {
         return broadcast.startTime <= now && now <= endTime
     }
 
+    private func shortcutPill(icon: String? = nil, label: String, showSpinner: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            if showSpinner {
+                ProgressView().tint(.white).scaleEffect(0.7)
+            } else if let icon {
+                Image(systemName: icon).font(.caption)
+            }
+            Text(label).font(.caption).fontWeight(.semibold)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.cardBg)
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.transistorGreen.opacity(0.5), lineWidth: 1)
+        )
+    }
+
     private func isShortcutMatch(_ broadcast: Broadcast, keywords: [String]) -> Bool {
         let title = broadcast.displayTitle.lowercased()
         return keywords.contains(where: { title.contains($0) })
+    }
+
+    private func handleShortcut(_ action: ShortcutAction) {
+        switch action {
+        case .broadcast(let broadcast):
+            // Navigeer naar broadcast detail — trigger via NavigationLink
+            // We gebruiken de viewModel.broadcasts navigation
+            break
+        case .journaalBulletin:
+            playNearestJournaalBulletin()
+        }
+    }
+
+    private func playNearestJournaalBulletin() {
+        isLoadingJournaal = true
+
+        Task {
+            do {
+                // Zoek de NOS Journaal uitzending van vandaag
+                let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: "radio1")
+                let journaalItem = list.first(where: {
+                    $0.title.lowercased().contains("journaal")
+                })
+
+                guard let journaalItem else {
+                    isLoadingJournaal = false
+                    return
+                }
+
+                // Haal de detail op voor de terugluister-URL
+                guard let detail = try await NPOAPIService.shared.fetchBroadcastDetail(
+                    forChannel: "radio1",
+                    broadcastUrl: journaalItem.url
+                ), let listenBackUrl = detail.listenBackUrl, !listenBackUrl.isEmpty else {
+                    isLoadingJournaal = false
+                    return
+                }
+
+                // Bereken het dichtstbijzijnde hele uur
+                // De opname begint op een vast tijdstip (bijv. 06:00)
+                // Elk heel uur is er een bulletin
+                let now = Date()
+                let calendar = Calendar.current
+                let currentHour = calendar.component(.hour, from: now)
+
+                // Parse de starttijd van de journaal-uitzending uit de titel/time
+                let startHour: Int
+                if let time = journaalItem.time, let firstPart = time.components(separatedBy: " - ").first {
+                    let parts = firstPart.trimmingCharacters(in: .whitespaces).components(separatedBy: ":")
+                    startHour = Int(parts.first ?? "6") ?? 6
+                } else {
+                    startHour = 6 // default ochtendblok
+                }
+
+                // Seek offset: (dichtstbijzijnde afgelopen heel uur - starttijd) in seconden
+                let targetHour = min(currentHour, 23)
+                let offsetHours = max(0, targetHour - startHour)
+                let seekOffset = Double(offsetHours * 3600)
+
+                // Speel af en seek
+                await audioPlayer.playOnDemand(
+                    url: listenBackUrl,
+                    title: "NOS Journaal \(targetHour):00",
+                    imageUrl: detail.imageUrl,
+                    source: "npo",
+                    channelId: "radio1"
+                )
+
+                if seekOffset > 0 {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    audioPlayer.seek(to: seekOffset)
+                }
+            } catch {
+                print("Error loading journaal: \(error)")
+            }
+            isLoadingJournaal = false
+        }
     }
 
     private func dateLabel(for date: Date) -> String {
