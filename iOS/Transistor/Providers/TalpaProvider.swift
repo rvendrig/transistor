@@ -1,10 +1,48 @@
 import Foundation
 
-// Talpa Network Mapping → Transistor Model
-// ──────────────────────────────────────
-// Talpa              → Network
-// Station            → Channel
-// (no programme data available via public API)
+// ============================================================================
+// Talpa Provider — Talpa Network (538, Sky Radio, Radio 10, Veronica, SLAM!)
+// ============================================================================
+//
+// ## Mapping → Transistor Model
+//
+// Talpa Network   → Network
+// Station         → Channel   (Radio 538, Sky Radio, etc.)
+// (geen data)     → Show, Broadcast, Segment — niet beschikbaar
+//
+// ## Databronnen
+//
+// Talpa heeft GEEN publieke API voor programma-informatie, schedule,
+// of terugluisteren. De websites (538.nl, skyradio.nl, etc.) zijn
+// volledig client-rendered (Next.js) zonder bruikbare server-side data.
+//
+// ### Beschikbaar
+// - Live streams via StreamTheWorld (Triton Digital)
+//   Format: MP3 128kbps, redirect via playerservices.streamtheworld.com
+// - Homepage toont huidige show (initialShow in Next.js props) maar
+//   zonder schedule of historie
+//
+// ### Niet beschikbaar
+// - Dagprogramma / schedule
+// - Terugluisteren
+// - Tracks / nu gespeeld
+// - Fragmenten
+// - Podcasts (individuele shows hebben feeds op Omny/Spotify, maar
+//   geen centraal overzicht)
+//
+// ## Capabilities
+//
+// Alleen .liveStream — alle andere capabilities zijn uitgeschakeld.
+// Bij het tikken op een Talpa-zender toont de app alleen een
+// "Luister live" knop (LiveOnlyChannelView).
+//
+// ## Toekomst
+//
+// Mogelijke bronnen voor schedule-data:
+// - Radio Browser API (alleen stream-metadata, geen schedule)
+// - Handmatige invoer via configurator-tool
+// - Talpa eventueel opent een publieke API
+// ============================================================================
 
 class TalpaProvider: ContentProvider {
     let id = "talpa"

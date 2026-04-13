@@ -1,14 +1,89 @@
 import Foundation
 
-// NPO POMS Mapping -> Transistor Model
-// -------------------------------------
-// NPO (implicit)       -> Network
-// Zender               -> Channel
-// Programma (UMBRELLA) -> Show
-// Seizoen (SEASON)     -> Season
-// Uitzending (BROADCAST) -> Broadcast
-// Item/Fragment        -> Segment
-// Clip (CLIP)          -> Clip
+// ============================================================================
+// NPO Provider — Nederlandse Publieke Omroep
+// ============================================================================
+//
+// ## POMS Mapping → Transistor Model
+//
+// NPO (implicit)         → Network
+// Zender                  → Channel        (Radio 1, 3FM, Klassiek, etc.)
+// Programma (UMBRELLA)    → Show           (Spraakmakers, Argos, etc.)
+// Seizoen (SEASON)        → Season
+// Uitzending (BROADCAST)  → Broadcast      (één aflevering op een specifiek tijdstip)
+// Item/Fragment           → Segment        (interview, nieuwsblok, muziek)
+// Clip (CLIP)             → Clip
+//
+// ## Databronnen
+//
+// NPO heeft geen enkele publieke API. Alle data wordt opgehaald via de
+// station-websites (Prepr CMS) en HTML-scraping. Geen auth nodig, wel
+// User-Agent header vereist (anders 403).
+//
+// ### 1. Dagprogramma (broadcasts)
+//   Bron: GET https://www.{station}.nl/api/broadcasts
+//   Geeft: titel, presentatoren, omroep, start/stoptijd, afbeelding
+//   Scope: resterende programma's van vandaag (vanaf nu)
+//   Gebruikt door: fetchBroadcasts(forChannel:)
+//
+// ### 2. Gespeelde tracks
+//   Bron: GET https://www.{station}.nl/api/tracks
+//   Geeft: artiest, titel, start/eindtijd, artwork, Spotify-link
+//   Extra velden bij Klassiek: componist, orkest, solist, dirigent, label
+//   Scope: recent gespeelde nummers
+//
+// ### 3. Uitzendingen-lijst (met detail-URLs)
+//   Bron: HTML-scrape van https://www.{station}.nl/uitzendingen
+//   Geeft: titel, datum, tijden, afbeelding, URL naar detailpagina
+//   Scope: ~20 meest recente afgelopen uitzendingen
+//   Gebruikt door: fetchBroadcasts(forChannel:) voor detailUrl enrichment
+//
+// ### 4. Uitzending-detail (rijke metadata)
+//   Bron: HTML-scrape van https://www.{station}.nl/uitzendingen/{slug}/{uuid}/{datum}
+//   Geeft: volledige beschrijving, presentatoren (array), omroep,
+//          terugluister-MP3 (entry.cdn.npoaudio.nl), fragmenten met
+//          afbeeldingen, programma-info (naam, URL, recording-status)
+//   Koppeling: via detailUrl op Broadcast (gezet bij stap 1+3)
+//
+// ### 5. Programma-pagina (show-niveau)
+//   Bron: HTML-scrape van https://www.{station}.nl/programmas/{slug}
+//   Geeft: beschrijving, afbeelding, lijst eerdere uitzendingen,
+//          podcast-feed URL (als die bestaat)
+//
+// ### 6. Live streams
+//   Bron: Icecast — https://icecast.omroep.nl/{station-id}-bb-mp3
+//   Format: MP3 ~192kbps
+//
+// ### 7. Terugluisteren (on-demand audio)
+//   Bron: https://entry.cdn.npoaudio.nl/handle/{MID}.mp3
+//   Beschikbaarheid: tijdelijk (weken/maanden), niet alle uitzendingen
+//   Detectie: programme.recording == true op de detailpagina
+//
+// ### 8. Podcasts
+//   Bron: RSS feed — https://podcast.npo.nl/feed/{slug}.xml
+//   Beschikbaarheid: permanent, soms bewerkte versie van de uitzending
+//   Detectie: podcastFeedUrl veld op de programma-pagina
+//   Overzicht: https://www.{station}.nl/podcasts (alle feeds per zender)
+//
+// ## Enrichment-strategie
+//
+// Het dagprogramma (/api/broadcasts) bevat geen detail-URL of UUID.
+// Om de link naar de detailpagina te leggen:
+// 1. Haal dagprogramma op via /api/broadcasts
+// 2. Haal uitzendingen-lijst op via /uitzendingen (HTML-scrape)
+// 3. Match elke broadcast op titel (case-insensitive) met de uitzendingen-lijst
+// 4. Zet de gematchte URL als detailUrl op het Broadcast-object
+// 5. Bij het openen van detail: gebruik detailUrl direct (geen title-matching)
+//
+// Beperking: toekomstige uitzendingen hebben geen detailUrl (staan niet
+// op /uitzendingen). De detailpagina is pas beschikbaar na de uitzending.
+//
+// ## Station URL mapping
+//
+// radio1  → nporadio1.nl    | radio4 → npoklassiek.nl
+// radio2  → nporadio2.nl    | radio5 → nporadio5.nl
+// 3fm     → npo3fm.nl       | funx   → funx.nl
+// ============================================================================
 
 // MARK: - NPO Provider Implementation
 class NPOProvider: ContentProvider {

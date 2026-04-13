@@ -87,20 +87,36 @@ xcodebuild -target Transistor -sdk iphoneos26.4 -configuration Debug build \
 3. Update this file when making architectural changes
 4. Don't trust SESSION_SUMMARY.md etc. — trust the code and this file
 
-## Provider Mapping Template
+## Provider Documentatie Template
 
-Bij het toevoegen van een nieuwe provider, documenteer de mapping bovenaan het provider-bestand:
+Bij het toevoegen van een nieuwe provider, documenteer bovenaan het provider-bestand:
+
 ```
-// <Provider> Mapping → Transistor Model
-// ──────────────────────────────────────
-// <hun term>  → Network
-// <hun term>  → Channel
-// <hun term>  → Show
-// <hun term>  → Season
-// <hun term>  → Broadcast / Episode
-// <hun term>  → Segment
-// <hun term>  → Clip
+// ============================================================================
+// <Provider> Provider — <beschrijving>
+// ============================================================================
+//
+// ## Mapping → Transistor Model
+// <hun term>  → Network / Channel / Show / Season / Broadcast / Segment / Clip
+//
+// ## Databronnen
+// Per bron: URL-patroon, wat het retourneert, scope, auth-vereisten
+//
+// ## Enrichment-strategie
+// Hoe worden broadcasts gekoppeld aan detail-URLs?
+// - Direct (API geeft URL/ID) → detailUrl op Broadcast
+// - Indirect (title matching) → match met uitzendingen-lijst
+// - Niet beschikbaar → detailUrl: nil, alleen basis-info
+//
+// ## Capabilities
+// Welke ChannelCapability's worden ondersteund en waarom niet
+//
+// ## Beperkingen
+// Geo-restricties, ontbrekende data, tijdelijke beschikbaarheid
+// ============================================================================
 ```
+
+Zie NPOProvider.swift voor een volledig voorbeeld.
 
 ## What To Work On Next
 

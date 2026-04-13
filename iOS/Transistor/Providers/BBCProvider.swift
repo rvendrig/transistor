@@ -1,14 +1,47 @@
 import Foundation
 
-// BBC Sounds Mapping → Transistor Model
-// ──────────────────────────────────────
-// BBC                → Network
-// Service (Radio 4)  → Channel
-// Brand              → Show
-// Series             → Season
-// Episode            → Broadcast / Episode
-// Segment            → Segment
-// Clip               → Clip
+// ============================================================================
+// BBC Provider — BBC Sounds (momenteel niet geregistreerd)
+// ============================================================================
+//
+// ## Mapping → Transistor Model
+//
+// BBC              → Network
+// Service (Radio 4) → Channel
+// Brand             → Show
+// Series            → Season
+// Episode           → Broadcast / Episode
+// Segment           → Segment
+// Clip              → Clip
+//
+// ## Databronnen
+//
+// ### Schedule (werkt internationaal)
+//   Bron: GET https://rms.api.bbc.co.uk/v2/experience/inline/schedules/{service_id}
+//   Geeft: titel (primary + secondary), synopsis, start/eind (ISO8601 UTC),
+//          duur, netwerk-logo, episode PID
+//   Geen auth nodig, JSON response
+//
+// ### Live streams (GEO-RESTRICTED — alleen UK)
+//   BBC blokkeert alle live streams buiten het Verenigd Koninkrijk.
+//   stream.live.vc.bbcmedia.co.uk retourneert 400 Bad Request buiten UK.
+//   Geen workaround beschikbaar zonder VPN.
+//
+// ### Niet geïmplementeerd
+// - Terugluisteren (BBC Sounds app, vereist authenticatie)
+// - Tracks / nu gespeeld
+// - Fragmenten / segmenten
+// - Podcasts (BBC podcasts zijn beschikbaar via reguliere RSS feeds)
+//
+// ## Status
+//
+// Deze provider is NIET geregistreerd in TransistorApp.init() vanwege de
+// geo-restrictie op audio. De code blijft als referentie voor als BBC
+// toegang wordt toegevoegd (bijv. voor UK-gebruikers).
+//
+// Om te activeren: voeg toe aan TransistorApp.init():
+//   ProviderStore.shared.registerProvider(BBCProvider())
+// ============================================================================
 
 class BBCProvider: ContentProvider {
     let id = "bbc"
