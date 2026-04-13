@@ -104,7 +104,41 @@ Bij het toevoegen van een nieuwe provider, documenteer de mapping bovenaan het p
 
 ## What To Work On Next
 
-1. **Vind een echte NPO data-bron** — de fake API is de grootste blocker
-2. **Verifieer audio stream URLs** — test of HLS URLs resolven
-3. **Verwijder legacy NPO views** — `NPOChannelsViewUpdated.swift` kan vervangen worden door `BrowseView`
-4. **Voeg een tweede provider toe** (BBC Sounds, Spotify) om het multi-provider model te valideren
+### Hoge prioriteit
+1. **Fragment afspelen** — play-knoppen bij fragmenten doen niets, URL moet uit fragment-pagina gescraped worden
+2. **Podcasts toevoegen via RSS** — "Voeg toe" knop in Browse, RSS feed parsing, episodes tonen
+3. **Dag-navigatie verbeteren** — andere dagen dan vandaag missen echte tijden
+4. **Push notifications** — "Herinner mij" knop moet lokale notificatie aanmaken
+
+### Medium prioriteit
+5. **Verwijder legacy views** — `NPOChannelsViewUpdated.swift`, `NPOItemDetailView.swift`, `ScheduleView.swift`, `ProvidersView.swift`, `ListeningHubView.swift` worden niet meer gebruikt in tabs
+6. **Tweede provider (BBC Sounds)** — valideer het multi-provider model
+7. **Playlist/marker/favorites testen** — add from detail views, persistentie na app restart
+8. **Entity extraction** — herken boeken, personen, locaties in beschrijvingen → deep links
+
+### Toekomst
+- CarPlay, WatchOS
+- Transcript/text overlay
+- Cross-device sync
+
+## Debugging Tips
+
+**Build problemen:**
+- iOS 18.0+ target, Swift 5.9, Xcode 26
+- `xcodegen generate` als bestanden toegevoegd/verwijderd
+- Scheme verdwijnt soms na xcodegen → opnieuw genereren
+
+**Audio speelt niet:**
+- Check AVAudioSession in `AudioPlayerService.setupAudioSession()`
+- NPO API's vereisen User-Agent header (staat in NPOAPIService)
+- Simulator: check Mac volume, Simulator → Features → Audio Output
+
+**Listening session verschijnt niet in Log:**
+- `AudioPlayerService.startSession()` wordt aangeroepen bij play
+- Check `DatabaseService.createListeningSession()` return value
+- SQLite database: `~/Library/Documents/transistor.db`
+
+**Provider verschijnt niet:**
+- Check registratie in `TransistorApp.init()`
+- Check `ProviderStore.shared.activeProviders`
+- Toggle in Settings tab
