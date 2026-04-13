@@ -133,7 +133,8 @@ class BBCProvider: ContentProvider {
                 description: synopsis,
                 image: logoUrl,
                 audioUrl: Self.streamURLs[channelId],
-                titleOverride: nil
+                titleOverride: nil,
+                detailUrl: nil
             )
         }
     }

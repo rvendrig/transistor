@@ -559,7 +559,8 @@ struct BrowseScheduleView: View {
                         description: nil,
                         image: item.imageUrl,
                         audioUrl: nil,
-                        titleOverride: nil
+                        titleOverride: nil,
+                        detailUrl: nil
                     )
                 }
             }
@@ -1036,18 +1037,25 @@ struct BroadcastDetailView: View {
     private func loadDetail() async {
         guard !channelId.isEmpty else { return }
 
-        // First get the broadcast list to find the URL for this broadcast
         do {
+            // Direct URL beschikbaar → gebruik die
+            if let detailUrl = broadcast.detailUrl, !detailUrl.isEmpty {
+                detail = try await NPOAPIService.shared.fetchBroadcastDetail(
+                    forChannel: channelId,
+                    broadcastUrl: detailUrl
+                )
+                let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
+                broadcastList = list.filter { $0.url != detailUrl }
+                return
+            }
+
+            // Fallback: zoek op titel
             let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
             let title = broadcast.displayTitle.lowercased()
 
             let match = list.first(where: { $0.title.lowercased().hasPrefix(title) })
                 ?? list.first(where: { $0.title.lowercased().contains(title) })
                 ?? list.first(where: { title.contains($0.title.lowercased()) })
-                ?? list.first(where: {
-                    let firstWord = title.components(separatedBy: " ").first ?? ""
-                    return firstWord.count > 3 && $0.title.lowercased().contains(firstWord)
-                })
 
             if let match {
                 detail = try await NPOAPIService.shared.fetchBroadcastDetail(

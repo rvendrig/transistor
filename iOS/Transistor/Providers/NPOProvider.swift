@@ -158,6 +158,14 @@ class NPOProvider: ContentProvider {
     func fetchBroadcasts(forChannel channelId: String) async throws -> [Broadcast] {
         let apiBroadcasts = try await apiService.fetchBroadcasts(forChannel: channelId)
 
+        // Fetch uitzendingen list to match detail URLs
+        let broadcastListItems: [NPOBroadcastListItem]
+        do {
+            broadcastListItems = try await apiService.fetchBroadcastList(forChannel: channelId)
+        } catch {
+            broadcastListItems = []
+        }
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
 
@@ -165,6 +173,16 @@ class NPOProvider: ContentProvider {
             guard let startTime = dateFormatter.date(from: api.startdatetime) else { return nil }
             let endTime = dateFormatter.date(from: api.stopdatetime) ?? startTime
             let duration = Int(endTime.timeIntervalSince(startTime))
+
+            // Match by title (case-insensitive) using cascading logic
+            let apiTitleLower = api.title.lowercased()
+            let detailUrl: String? = broadcastListItems.first(where: {
+                $0.title.lowercased() == apiTitleLower
+            })?.url ?? broadcastListItems.first(where: {
+                $0.title.lowercased().hasPrefix(apiTitleLower) || apiTitleLower.hasPrefix($0.title.lowercased())
+            })?.url ?? broadcastListItems.first(where: {
+                $0.title.lowercased().contains(apiTitleLower) || apiTitleLower.contains($0.title.lowercased())
+            })?.url
 
             return Broadcast(
                 id: "\(channelId)-\(api.startdatetime)",
@@ -178,7 +196,8 @@ class NPOProvider: ContentProvider {
                 description: api.presenters,
                 image: api.image_url_400x400 ?? api.image_url,
                 audioUrl: NPOAPIService.streamURLs[channelId],
-                titleOverride: nil
+                titleOverride: nil,
+                detailUrl: detailUrl
             )
         }.sorted { $0.startTime < $1.startTime }
     }
@@ -202,7 +221,8 @@ class NPOProvider: ContentProvider {
                     description: npoBroadcast.description,
                     image: npoBroadcast.image,
                     audioUrl: npoBroadcast.audioUrl,
-                    titleOverride: nil
+                    titleOverride: nil,
+                    detailUrl: nil
                 )
             }
         } catch {
@@ -223,7 +243,8 @@ class NPOProvider: ContentProvider {
                     description: npoBroadcast.description,
                     image: npoBroadcast.image,
                     audioUrl: nil,
-                    titleOverride: nil
+                    titleOverride: nil,
+                    detailUrl: nil
                 )
             }
         }
@@ -281,7 +302,8 @@ class NPOProvider: ContentProvider {
                     description: npoBroadcast.description,
                     image: npoBroadcast.image,
                     audioUrl: nil,
-                    titleOverride: nil
+                    titleOverride: nil,
+                    detailUrl: nil
                 )
             }
         } catch {

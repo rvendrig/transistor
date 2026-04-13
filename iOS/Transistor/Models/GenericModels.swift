@@ -141,6 +141,7 @@ struct Broadcast: Identifiable, Codable, AudioContent, Hashable {
     let image: String?
     let audioUrl: String?
     let titleOverride: String?
+    let detailUrl: String?
 
     var displayTitle: String {
         titleOverride ?? title
@@ -159,6 +160,7 @@ struct Broadcast: Identifiable, Codable, AudioContent, Hashable {
         case startTime = "start_time"
         case audioUrl = "audio_url"
         case titleOverride = "title_override"
+        case detailUrl = "detail_url"
     }
 }
 

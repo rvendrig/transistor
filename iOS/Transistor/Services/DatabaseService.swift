@@ -16,6 +16,7 @@ class DatabaseService {
 
         openDatabase()
         createTables()
+        migrateSchema()
     }
 
     // MARK: - Database Setup
@@ -85,7 +86,8 @@ class DatabaseService {
             description TEXT,
             image TEXT,
             audio_url TEXT,
-            title_override TEXT
+            title_override TEXT,
+            detail_url TEXT
         )
         """
 
@@ -280,6 +282,13 @@ class DatabaseService {
         }
     }
 
+    private func migrateSchema() {
+        // Add detail_url column to broadcasts if it doesn't exist yet
+        let alterSQL = "ALTER TABLE broadcasts ADD COLUMN detail_url TEXT"
+        // Ignore error if column already exists
+        sqlite3_exec(db, alterSQL, nil, nil, nil)
+    }
+
     // MARK: - JSON Helpers
 
     private func encodeTitles(_ titles: [TitledPeriod]) -> String? {
@@ -377,8 +386,8 @@ class DatabaseService {
 
     func saveBroadcast(_ broadcast: Broadcast) {
         let query = """
-        INSERT OR REPLACE INTO broadcasts (id, provider_id, title, show_id, channel_id, season_id, start_time, duration, description, image, audio_url, title_override)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO broadcasts (id, provider_id, title, show_id, channel_id, season_id, start_time, duration, description, image, audio_url, title_override, detail_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         var statement: OpaquePointer?
@@ -414,6 +423,9 @@ class DatabaseService {
             if let titleOverride = broadcast.titleOverride {
                 sqlite3_bind_text(statement, 12, titleOverride, -1, SQLITE_TRANSIENT)
             }
+            if let detailUrl = broadcast.detailUrl {
+                sqlite3_bind_text(statement, 13, detailUrl, -1, SQLITE_TRANSIENT)
+            }
 
             if sqlite3_step(statement) != SQLITE_DONE {
                 print("Error saving broadcast")
@@ -436,14 +448,15 @@ class DatabaseService {
             description: broadcast.description,
             image: broadcast.image,
             audioUrl: broadcast.audioUrl,
-            titleOverride: nil
+            titleOverride: nil,
+            detailUrl: nil
         )
         saveBroadcast(generic)
     }
 
     func getBroadcastsByShow(_ showId: String) -> [Broadcast] {
         var broadcasts: [Broadcast] = []
-        let query = "SELECT id, provider_id, title, show_id, channel_id, season_id, start_time, duration, description, image, audio_url, title_override FROM broadcasts WHERE show_id = ?"
+        let query = "SELECT id, provider_id, title, show_id, channel_id, season_id, start_time, duration, description, image, audio_url, title_override, detail_url FROM broadcasts WHERE show_id = ?"
 
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
@@ -463,6 +476,7 @@ class DatabaseService {
                 let image = sqlite3_column_text(statement, 9).map { String(cString: $0) }
                 let audioUrl = sqlite3_column_text(statement, 10).map { String(cString: $0) }
                 let titleOverride = sqlite3_column_text(statement, 11).map { String(cString: $0) }
+                let detailUrl = sqlite3_column_text(statement, 12).map { String(cString: $0) }
 
                 if let startTime = dateFormatter.date(from: dateString) {
                     let broadcast = Broadcast(
@@ -477,7 +491,8 @@ class DatabaseService {
                         description: description,
                         image: image,
                         audioUrl: audioUrl,
-                        titleOverride: titleOverride
+                        titleOverride: titleOverride,
+                        detailUrl: detailUrl
                     )
                     broadcasts.append(broadcast)
                 }

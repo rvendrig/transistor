@@ -508,18 +508,25 @@ struct NowPlayingView: View {
 
     private func loadBroadcastDetail(channelId: String, broadcast: Broadcast) async {
         do {
+            // Direct URL beschikbaar → gebruik die
+            if let detailUrl = broadcast.detailUrl, !detailUrl.isEmpty {
+                detail = try await NPOAPIService.shared.fetchBroadcastDetail(
+                    forChannel: channelId,
+                    broadcastUrl: detailUrl
+                )
+                // Laad ook de lijst voor "andere uitzendingen"
+                let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
+                broadcastList = list.filter { $0.url != detailUrl }
+                return
+            }
+
+            // Fallback: zoek op titel
             let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: channelId)
             let title = broadcast.displayTitle.lowercased()
 
-            // Match: hasPrefix, contains, of eerste woord
             let match = list.first(where: { $0.title.lowercased().hasPrefix(title) })
                 ?? list.first(where: { $0.title.lowercased().contains(title) })
                 ?? list.first(where: { title.contains($0.title.lowercased()) })
-                ?? list.first(where: {
-                    // Match op eerste woord
-                    let firstWord = title.components(separatedBy: " ").first ?? ""
-                    return firstWord.count > 3 && $0.title.lowercased().contains(firstWord)
-                })
 
             if let match {
                 detail = try await NPOAPIService.shared.fetchBroadcastDetail(
@@ -528,7 +535,6 @@ struct NowPlayingView: View {
                 )
                 broadcastList = list.filter { $0.url != match.url }
             } else {
-                // Geen match gevonden — toon de lijst als "andere uitzendingen"
                 broadcastList = list
             }
         } catch {
