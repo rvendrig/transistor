@@ -22,6 +22,7 @@
 		609C31175D48B87946D98891 /* MarkerCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */; };
 		62B18744EC7606BE87E17719 /* FavoritesButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 070C3442252A7AEFC68248DB /* FavoritesButton.swift */; };
 		64D24608784059587A20FFFA /* MarkerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */; };
+		681BB65AA38B5D2DFB9A74DC /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5176CB7E95ACE61B78E108B /* NowPlayingView.swift */; };
 		73E92EA90D48EF12F2302792 /* PlaylistDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530A8C92CA984E1733662744 /* PlaylistDetailView.swift */; };
 		76C07EF2CBD263030FB34039 /* ContentWizardBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FAB182B421ACCD9188D119 /* ContentWizardBase.swift */; };
 		82F653D16C529973CA92B5C8 /* GenericModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5483D8FC4DA0AF1423EF5E5 /* GenericModels.swift */; };
@@ -70,6 +71,7 @@
 		AF8CF7C80C2D547F31E5086D /* NPOAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOAPIService.swift; sourceTree = "<group>"; };
 		B055A7E0D5846B379EB6C85F /* AddToPlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToPlaylistView.swift; sourceTree = "<group>"; };
 		B433353F6F7CFAE2D100F438 /* ContentConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentConfiguration.swift; sourceTree = "<group>"; };
+		B5176CB7E95ACE61B78E108B /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
 		B815790244BD61BEC25BEEE2 /* NPOProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPOProvider.swift; sourceTree = "<group>"; };
 		C54098BFD1E0CCE819A8F337 /* CreatePlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePlaylistView.swift; sourceTree = "<group>"; };
 		CAE3EB1F1011EBC185C29A77 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
@@ -152,6 +154,7 @@
 				84D3F687D3C46D2638154257 /* LogView.swift */,
 				4CE2B3D4618639F585176751 /* MarkerCreationSheet.swift */,
 				69CCE9CB0AE023A2AAD3ACC3 /* MarkerListView.swift */,
+				B5176CB7E95ACE61B78E108B /* NowPlayingView.swift */,
 				6E2BAD73B3FAC606FA35D8E0 /* NPOChannelsViewUpdated.swift */,
 				99309D56701ED7DDB6A6579A /* NPOItemDetailView.swift */,
 				9AC9AF6C1D4E2FE5795DCF2F /* PlaybackView.swift */,
@@ -271,6 +274,7 @@
 				C92C3166F63C5F6378342970 /* NPOItemDetailView.swift in Sources */,
 				E503C37428705ADA96EF5559 /* NPOProvider.swift in Sources */,
 				B36903D4AC74E14D04772429 /* NPOViewModel.swift in Sources */,
+				681BB65AA38B5D2DFB9A74DC /* NowPlayingView.swift in Sources */,
 				EE56E21A092C4251D68E8338 /* PlaybackView.swift in Sources */,
 				73E92EA90D48EF12F2302792 /* PlaylistDetailView.swift in Sources */,
 				840D04EE4A9F0CE736DF392F /* PlaylistsView.swift in Sources */,
