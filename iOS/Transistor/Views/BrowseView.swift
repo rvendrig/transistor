@@ -536,65 +536,91 @@ struct BrowseScheduleView: View {
 
         Task {
             do {
-                // Zoek de NOS Journaal uitzending van vandaag
                 let list = try await NPOAPIService.shared.fetchBroadcastList(forChannel: "radio1")
-                let journaalItem = list.first(where: {
+
+                // Zoek alle journaal-uitzendingen, meest recente eerst
+                let journaalItems = list.filter {
                     $0.title.lowercased().contains("journaal")
-                })
+                }
 
-                guard let journaalItem else {
+                // Probeer elke journaal-uitzending (nieuwste eerst) totdat we een werkende vinden
+                for journaalItem in journaalItems {
+                    guard let detail = try await NPOAPIService.shared.fetchBroadcastDetail(
+                        forChannel: "radio1",
+                        broadcastUrl: journaalItem.url
+                    ), let entryUrl = detail.listenBackUrl, !entryUrl.isEmpty else {
+                        continue
+                    }
+
+                    // Resolve de entry.cdn URL naar de echte stream URL
+                    let resolvedUrl = try await NPOAPIService.shared.resolveListenBackURL(entryUrl)
+
+                    // Parse start- en eindtijd van dit blok
+                    let (startHour, endHour) = parseHourRange(journaalItem.time)
+
+                    // Bereken het dichtstbijzijnde afgelopen hele uur binnen dit blok
+                    let now = Date()
+                    let calendar = Calendar.current
+                    let currentHour = calendar.component(.hour, from: now)
+
+                    // Check of het huidige uur binnen dit blok valt
+                    let targetHour: Int
+                    if currentHour >= startHour && currentHour < endHour {
+                        // We zitten in dit blok — seek naar het huidige uur
+                        targetHour = currentHour
+                    } else if currentHour >= endHour {
+                        // Dit blok is voorbij — seek naar het laatste uur
+                        targetHour = endHour - 1
+                    } else {
+                        // Dit blok is nog niet begonnen — probeer een eerder blok
+                        continue
+                    }
+
+                    let offsetHours = max(0, targetHour - startHour)
+                    let seekOffset = Double(offsetHours * 3600)
+
+                    // Speel af
+                    await audioPlayer.playOnDemand(
+                        url: resolvedUrl,
+                        title: "NOS Journaal \(targetHour):00",
+                        imageUrl: detail.imageUrl,
+                        source: "npo",
+                        channelId: "radio1"
+                    )
+
+                    // Seek na buffering
+                    if seekOffset > 0 {
+                        // Wacht tot player daadwerkelijk speelt
+                        for _ in 0..<20 {
+                            try? await Task.sleep(nanoseconds: 250_000_000)
+                            if audioPlayer.isPlaying { break }
+                        }
+                        audioPlayer.seek(to: seekOffset)
+                    }
+
                     isLoadingJournaal = false
-                    return
+                    return // Gelukt
                 }
 
-                // Haal de detail op voor de terugluister-URL
-                guard let detail = try await NPOAPIService.shared.fetchBroadcastDetail(
-                    forChannel: "radio1",
-                    broadcastUrl: journaalItem.url
-                ), let listenBackUrl = detail.listenBackUrl, !listenBackUrl.isEmpty else {
-                    isLoadingJournaal = false
-                    return
-                }
-
-                // Bereken het dichtstbijzijnde hele uur
-                // De opname begint op een vast tijdstip (bijv. 06:00)
-                // Elk heel uur is er een bulletin
-                let now = Date()
-                let calendar = Calendar.current
-                let currentHour = calendar.component(.hour, from: now)
-
-                // Parse de starttijd van de journaal-uitzending uit de titel/time
-                let startHour: Int
-                if let time = journaalItem.time, let firstPart = time.components(separatedBy: " - ").first {
-                    let parts = firstPart.trimmingCharacters(in: .whitespaces).components(separatedBy: ":")
-                    startHour = Int(parts.first ?? "6") ?? 6
-                } else {
-                    startHour = 6 // default ochtendblok
-                }
-
-                // Seek offset: (dichtstbijzijnde afgelopen heel uur - starttijd) in seconden
-                let targetHour = min(currentHour, 23)
-                let offsetHours = max(0, targetHour - startHour)
-                let seekOffset = Double(offsetHours * 3600)
-
-                // Speel af en seek
-                await audioPlayer.playOnDemand(
-                    url: listenBackUrl,
-                    title: "NOS Journaal \(targetHour):00",
-                    imageUrl: detail.imageUrl,
-                    source: "npo",
-                    channelId: "radio1"
-                )
-
-                if seekOffset > 0 {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    audioPlayer.seek(to: seekOffset)
-                }
+                print("Geen journaal-uitzending met terugluisteren gevonden")
             } catch {
                 print("Error loading journaal: \(error)")
             }
             isLoadingJournaal = false
         }
+    }
+
+    private func parseHourRange(_ timeStr: String?) -> (Int, Int) {
+        guard let timeStr else { return (6, 10) }
+        let parts = timeStr.components(separatedBy: " - ")
+        guard parts.count == 2 else { return (6, 10) }
+
+        func hourFrom(_ str: String) -> Int {
+            let hm = str.trimmingCharacters(in: .whitespaces).components(separatedBy: ":")
+            return Int(hm.first ?? "0") ?? 0
+        }
+
+        return (hourFrom(parts[0]), hourFrom(parts[1]))
     }
 
     private func dateLabel(for date: Date) -> String {

@@ -33,6 +33,31 @@ class NPOAPIService {
         self.session = URLSession(configuration: config)
     }
 
+    // MARK: - Resolve listen-back URL
+    // entry.cdn.npoaudio.nl returns JSON with a redirect URL, not audio directly.
+    // This resolves the redirect to the actual streamable MP3 URL.
+
+    func resolveListenBackURL(_ entryUrl: String) async throws -> String {
+        guard let url = URL(string: entryUrl) else { return entryUrl }
+
+        let (data, _) = try await session.data(from: url)
+
+        // Check if response is JSON with redirect
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let body = json["body"] as? String {
+            // Extract URL from "Redirecting to <url> for ..."
+            if let range = body.range(of: "Redirecting to "),
+               let endRange = body[range.upperBound...].range(of: " for ") {
+                return String(body[range.upperBound..<endRange.lowerBound])
+            } else if let range = body.range(of: "Redirecting to ") {
+                return String(body[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // If not JSON, the URL itself might work (or already resolved)
+        return entryUrl
+    }
+
     // MARK: - Fetch Broadcasts (today's schedule for a channel)
 
     func fetchBroadcasts(forChannel channelId: String) async throws -> [NPOBroadcastAPI] {
